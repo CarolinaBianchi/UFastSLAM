@@ -11,6 +11,8 @@ ANGLE       = "ObservationAngle.txt"
 LASER_SAMP_T= "lasersampling.txt"        # 7249 elements
 TIMESTEPS   = "time.txt"                 # 61945 elements
 
+N_MEASUREMENTS = 0
+N_SAMPLING = 0
 
 class SensorMeasurement:
     """
@@ -32,9 +34,9 @@ class ListSensorMeasurements:
 class Sensor:
     # Reads the ANGLE/DISTANCE file, creates a List of objects of type ListSensorMeasurements.
     def __init__(self):
-        self.measurements = self.read_measurements()
+        self.measurements = self.__read_measurements()
 
-    def read_measurements(self):
+    def __read_measurements(self):
         """
         Reads the measurements file and populates self.measurements.
         """
@@ -49,6 +51,9 @@ class Sensor:
         f.close()
         measurements = [ListSensorMeasurements(time, [SensorMeasurement(dist, ang) for dist, ang in zip(distances, angles)]) for distances, angles, time in zip(d, a, t)]
 
+        global N_MEASUREMENTS, N_SAMPLING
+        N_MEASUREMENTS = len(measurements)
+        N_SAMPLING = len(t)
         #for distances,angles, time  in zip(d, a,t):
         #    measurement_dt = []
         #    for dist, ang in zip(distances, angles):
@@ -81,5 +86,6 @@ class Sensor:
         except: # no more measurements
             pass
         return l
+
 s = Sensor()
 #print(s.read(24300, 28440))

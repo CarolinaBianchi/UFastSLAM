@@ -2,7 +2,17 @@
 from numpy import zeros, pi
 from Sensor import N_MEASUREMENTS, N_SAMPLING
 from Vehicle import Vehicle
+from numpy import finfo, pi
 
+EPS = finfo(float).eps # Machine epsilon
+PI = pi
+
+PATH        = "../victoria_park/"
+TIME        = "time.txt"
+#TIME
+ftime  = open ( PATH + TIME, 'r')
+T = [float(line) for line in ftime]
+ftime.close()
 
 # H/W parameter(truck).
 DT= 0.025; # [s], time interval between control signals
