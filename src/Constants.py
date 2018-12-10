@@ -16,7 +16,7 @@ ftime.close()
 
 # H/W parameter(truck).
 DT= 0.025; # [s], time interval between control signals
-VEHICLE = Vehicle(2.83, 0.76, 0.5, 3.78)
+VEHICLE = Vehicle(2.83, 0.76, 0.5, 3.78) # L- H - b- a
 #veh= [0 -vehicle.H -vehicle.H; 0 -1 1];
 
 # Control noises
@@ -50,12 +50,12 @@ n_aug=dimv+dimf
 alpha_aug=0.9; beta_aug=2; kappa_aug=0
 lambda_aug = alpha_aug**2 * (n_aug + kappa_aug) - n_aug
 lambda_aug=lambda_aug+dimR
-wg_aug = zeros((1,2*n_aug+1)); wc_aug = zeros((1,2*n_aug+1))
+wg_aug = zeros((2*n_aug+1)); wc_aug = zeros((2*n_aug+1))
 wg_aug[0] = lambda_aug/(n_aug+lambda_aug)
 wc_aug[0] = lambda_aug/(n_aug+lambda_aug)+(1-alpha_aug**2+beta_aug)
 for i in range(1,(2*n_aug+1)):
-    wg_aug[0,i] = 1/(2*(n_aug+lambda_aug))
-    wc_aug[0,i] = wg_aug[0,i]
+    wg_aug[i] = 1/(2*(n_aug+lambda_aug))
+    wc_aug[i] = wg_aug[i]
 
 
 # Vehicle prediction
@@ -65,12 +65,12 @@ beta_r=2 # optimal for gaussian priors
 kappa_r=0
 lambda_r = alpha_r**2 * (n_r + kappa_r) - n_r
 lambda_r= lambda_r+dimR; # should consider dimension of related terms for obtaining equivalent effect with full augmentation
-wg_r = zeros((1,2*n_r+1)); wc_r = zeros((1,2*n_r+1))
+wg_r = zeros((2*n_r+1)); wc_r = zeros((2*n_r+1))
 wg_r[0] = lambda_r/(n_r + lambda_r)                            #weights to compute the mean
 wc_r[0] = lambda_r / (n_r+lambda_r) + (1 - alpha_r**2 + beta_r) #weights to compute the covariance
 for i in range(1,(2*n_r+1)):
-    wg_r[0,i] = 1/(2*(n_r+lambda_r))
-    wc_r[0,i] = wg_r[0,i]
+    wg_r[i] = 1/(2*(n_r+lambda_r))
+    wc_r[i] = wg_r[i]
 
 
 # Feature updates (augmented state)
