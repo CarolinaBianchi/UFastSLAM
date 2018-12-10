@@ -4,8 +4,6 @@ from Sensor import *
 from Vehicle import *
 import Constants as C
 
-
-
 def init_particles(npart):
     w = 1/npart;
     return [Particle(w) for i in range(npart)]
@@ -28,7 +26,6 @@ def main():
     ctrl    = ControlPublisher()
     sensor  = Sensor()
     particles = init_particles(C.NPARTICLES)
-
     for i,t in enumerate(C.T):
         ctrlData = ctrl.read(t)
 
@@ -43,7 +40,7 @@ def main():
             # Data associations
             for particle in particles:
                 particle.data_associateNN(z)
-
+            """
             # Known map features
             for particle in particles:
                 # Sample from optimal proposal distribution
@@ -59,7 +56,7 @@ def main():
                 particle.augment_map()
 
 
-
+            """
 
 
 

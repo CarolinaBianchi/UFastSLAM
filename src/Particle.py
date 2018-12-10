@@ -1,7 +1,9 @@
 """
 A particle.
 """
-from numpy import zeros, eye
+from math import sqrt, atan2
+import numpy as np
+from numpy import zeros, eye, size
 from Sensor import ListSensorMeasurements, SensorMeasurement
 from Control import Control
 import Constants as C
@@ -30,8 +32,8 @@ class Particle:
     wg_f_a = C.wg_f_a
     wc_f_a = C.wc_f_a
 
-    def __init__(self, weight, xv = zeros((3,1)), Pv = EPS*(eye(3)), Kaiy = [], \
-                xf = [], Pf = [], zf = [], idf = [], zn = [] ):
+    def __init__(self, weight, xv = zeros((3,1)), Pv = EPS*(eye(3)), Kaiy = np.empty([3, C.NPARTICLES]), \
+                xf = np.empty([2,0]), Pf = np.empty([2, 2, 0]), zf = np.empty([2, 0]), idf = np.empty([1, 0]), zn = np.empty([2, 0]) ):
         self.w  = weight        # Initial weight
         self.xv = xv            # Initial vehicle pose
         self.Pv = Pv            # Initial robot covariance that considers a numerical error
@@ -43,12 +45,12 @@ class Particle:
         self.zn = zn            # New feature locations
 
 
-    def predictACFRu(self, odometry):
+    def predictACFRu(self, ctrl):
         """
         #TO DO
         Predict the state of the car given the current velocity V and steering G.
         Modifies the particles predicted mean and covariance (xv, Pv), and sigma points (Kaiy).
-        :param odometry: object of type Odometry.
+        :param ctrl: object of type Control.
         """
         #print("predictACFRu")
 
@@ -59,10 +61,73 @@ class Particle:
         Modifies the particle's zf, idf and zn.
         :param z: list of of ListSensorMeasurements. NB: Can be empty.
         """
+        if(size(z)==0):
+            return
         R = Particle.Re
         G_REJ = Particle.GATE_REJECT
         G_AUG = Particle.GATE_AUGMENT
-        #print(z)
+        zf, zn, idf = np.array([]), np.array([]), np.array([])
+        Nf = size(self.xf, 1) # number of known features
+        xv = self.xv
+        zp = zeros((2, 1))
+
+        for list in z:
+            for meas in list.list: # Find the nearest feature
+                jbest = -1;
+                if Nf != 0 :
+                    jbest_s = -1
+                    outer = float("inf")
+
+                    for j in range(Nf):  # For any known feature
+                        dx = self.xf[0,j]-xv[0]
+                        dy = self.xf[1,j]-xv[1]
+                        d = sqrt(dx**2 + dy**2)             # Distance vehicle-feaure
+                        ang = pi_to_pi(atan2(dy, dx)-xv[2])
+                        v = np.array([[meas.distance - d],[pi_to_pi(meas.angle-ang)]])
+                        d2 = np.dot(np.transpose(v),v)
+                        if(d2 < dmin):
+                            dmin = d2
+                            jbest_s = j
+
+                    # Malahanobis test for the candidate neighbour
+                    nis = self.__compute_association_nis(meas, R, jbest_s) #nearest neighbor
+                    if nis < G_REJ :    # if within gate, store nearest neighbor
+                        jbest = jbest_s;
+                    elif nis < G_AUG :  # else store best nis value
+                        outer = nis
+
+                if jbest >=0:
+                    zf = np.stack(zf, [m.distance, m.angle])
+            self.zf, self.idf, self.zn = zf, idf, zn
+
+    def __compute_association_nis(self, z, R, idf):
+        """
+        Returns normalised innovation squared (Malahanobis distance)
+        """
+        zp, _, _, Sf, Sv = self.__compute_jacobians(idf, R)
+        v = z-zp                            # innovation
+        v[2] = pi_to_pi(v[2])
+        return np.dot(np.dot(np.transpose(v), np.inverse(Sf)), v)
+
+
+    def __compute_jacobians(self, idf, R):
+
+        xv = self.xv
+        xf = self.xf[:, idf]
+        Pf = particle.Pf[:,:,idf]
+        for i in range(len(idf)):
+            dx = xf[0, i] - xv[0]
+            dy = xf[1, i] - xv[1]
+            d2 = sqrt(dx**2 + dy**2)
+            d = sqrt(d2)
+            zp[:, i]  = np.array([[d],[pi_to_pi(atan2(dy, dx)-xv[2])]]) # predicted
+            Hv[:,:,i] = np.array([[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
+                                    [dy/d2, -dx/d2, -1]])
+            Hf[:,:,i] = np.array([[dx/d, dy/d],
+                                    [-dy/d2, dx/d2]])
+            Sf[:,:,i] = np.dot(np.dot(Hv[:,:,i], self.Pv), np.transpose(Hv[:,:,i]))+ R
+            Sv[:,:,i] = np.dot(np.dot(Hv[:,:,i], self.Pv), np.transpose(Hv[:,:,i]))+ R
+        return (zp, Hv, Hf, Sf, Sv)
 
     def sample_proposaluf(self):
         """
