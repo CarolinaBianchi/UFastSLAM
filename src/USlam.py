@@ -40,7 +40,7 @@ def main():
             # Data associations
             for particle in particles:
                 particle.data_associateNN(z)
-            """
+
             # Known map features
             for particle in particles:
                 # Sample from optimal proposal distribution
@@ -56,7 +56,7 @@ def main():
                 particle.augment_map()
 
 
-            """
+            
 
 
 

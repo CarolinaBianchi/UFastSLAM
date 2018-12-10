@@ -8,6 +8,8 @@ from Sensor import ListSensorMeasurements, SensorMeasurement
 from Control import Control
 import Constants as C
 import copy
+from math import sin, cos
+from Utils import pi_to_pi
 
 EPS = C.EPS
 
@@ -66,7 +68,7 @@ class Particle:
         R = Particle.Re
         G_REJ = Particle.GATE_REJECT
         G_AUG = Particle.GATE_AUGMENT
-        zf, zn, idf = np.array([]), np.array([]), np.array([])
+        zf, zn, idf = np.empty((2,1)),np.empty((2,1)),np.empty((2,1))
         Nf = size(self.xf, 1) # number of known features
         xv = self.xv
         zp = zeros((2, 1))
@@ -74,9 +76,10 @@ class Particle:
         for list in z:
             for meas in list.list: # Find the nearest feature
                 jbest = -1;
+                outer = float("inf")
                 if Nf != 0 :
+                    dmin = float("inf")
                     jbest_s = -1
-                    outer = float("inf")
 
                     for j in range(Nf):  # For any known feature
                         dx = self.xf[0,j]-xv[0]
@@ -97,36 +100,53 @@ class Particle:
                         outer = nis
 
                 if jbest >=0:
-                    zf = np.stack(zf, [m.distance, m.angle])
-            self.zf, self.idf, self.zn = zf, idf, zn
+                    zf = np.append(zf, np.array([[meas.distance], [meas.angle]]), axis = 1)
+                    idf = np.append(idf, np.array([[idf], [jbest]]), axis = 1)
+                elif outer > G_AUG :
+                    zn = np.append(zn, np.array([[meas.distance], [meas.angle]]), axis = 1)
+
+
+            self.zf, self.idf, self.zn = np.array(zf), np.array(idf), np.array(zn)
 
     def __compute_association_nis(self, z, R, idf):
         """
         Returns normalised innovation squared (Malahanobis distance)
         """
         zp, _, _, Sf, Sv = self.__compute_jacobians(idf, R)
+        z= np.array([z.distance, z.angle])
         v = z-zp                            # innovation
-        v[2] = pi_to_pi(v[2])
-        return np.dot(np.dot(np.transpose(v), np.inverse(Sf)), v)
+        v[1] = pi_to_pi(v[1])
+        Sf =np.array(Sf, dtype='float')
+        return np.dot(np.dot(np.transpose(v), np.linalg.inv(Sf)), v)
 
 
     def __compute_jacobians(self, idf, R):
 
         xv = self.xv
         xf = self.xf[:, idf]
-        Pf = particle.Pf[:,:,idf]
-        for i in range(len(idf)):
-            dx = xf[0, i] - xv[0]
-            dy = xf[1, i] - xv[1]
-            d2 = sqrt(dx**2 + dy**2)
-            d = sqrt(d2)
-            zp[:, i]  = np.array([[d],[pi_to_pi(atan2(dy, dx)-xv[2])]]) # predicted
-            Hv[:,:,i] = np.array([[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
-                                    [dy/d2, -dx/d2, -1]])
-            Hf[:,:,i] = np.array([[dx/d, dy/d],
-                                    [-dy/d2, dx/d2]])
-            Sf[:,:,i] = np.dot(np.dot(Hv[:,:,i], self.Pv), np.transpose(Hv[:,:,i]))+ R
-            Sv[:,:,i] = np.dot(np.dot(Hv[:,:,i], self.Pv), np.transpose(Hv[:,:,i]))+ R
+        Pf = self.Pf[:,:,idf]
+
+        #for i in range(len(idf)): #WHY WAS MATLAB CODE LIKE THAT??
+        dx = xf[0] - xv[0]
+        dy = xf[1] - xv[1]
+        d2 = sqrt(dx**2 + dy**2)
+        d = sqrt(d2)
+        zp = np.array([d,pi_to_pi(atan2(dy, dx)-xv[2])]) # predicted
+        if(d < 1e-15):
+            #print("Something's wrong")
+            #Temporary dirty, this should get fixed when the implementation
+            #is completed
+            Hv = np.array([[-500, -500, 0],
+                            [500, -500, -1]])
+            Hf = np.array([[500, 500],
+                        [-500, 500]])
+        else:
+            Hv = np.array(  [[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
+                            [dy/d2, -dx/d2, -1]])
+            Hf = np.array([[dx/d, dy/d],
+                            [-dy/d2, dx/d2]])
+        Sf = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
+        Sv = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
         return (zp, Hv, Hf, Sf, Sv)
 
     def sample_proposaluf(self):
@@ -163,26 +183,45 @@ class Particle:
             return
 
         if len(self.zf ==0): # Sample from proposal distribution, if we have not already done so above
-            self.xv = __multivariate_gauss(self.xv, self.Pv, 1)
+            self.xv = self.__multivariate_gauss(self.xv, self.Pv, 1)
             self.Pv = EPS * eye(3)
 
         self.__add_feature()
 
-    def __multivariate_gauss(x, P, n):
+    def __multivariate_gauss(self,x, P, n):
         """
-        Random sample from multivariate GAussian distribution.
+        Random sample from multivariate Gaussian distribution.
         :param x: mean vector
         :param P: covariance
         :param n: number of samples
         """
-        return []
+        samples = zeros((np.size(P,0), n))
+        for i in range(n):
+            samples[:,i] = np.random.multivariate_normal(np.squeeze(x), P)
+        return samples
 
-    def __add_feature():
+    def __add_feature(self):
         """
         Add new feature
         """
         R = Particle.Re
-        z = self.ze
+        z = self.zn
+        lenz = size(z, 1)
+        xf = zeros((2, lenz))
+        Pf = zeros((2, 2, lenz))
+        xv = self.xv
+
+        for i in range(lenz):
+            r, b = z[0, i], z[1, i]
+            s = sin(xv[2]+b)
+            c = cos(xv[2]+b)
+            xf[:,i] = np.squeeze(np.array([xv[0]+r*c, xv[1]+r*s]))
+            Gz = [[c, -r*s],
+                  [s,  r*c]]
+            Pf[:,:,i] = np.dot(np.dot(Gz, R),np.transpose(Gz))
+
+        self.xf = np.concatenate((self.xf,xf), 1)
+        self.Pf = np.concatenate((self.Pf, Pf), 2)
 
     def deepcopy(self):
         """
