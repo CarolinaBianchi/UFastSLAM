@@ -16,7 +16,7 @@ ftime.close()
 
 # H/W parameter(truck).
 DT= 0.025; # [s], time interval between control signals
-VEHICLE = Vehicle(2.83, 0.76, 0.5, 3.78)
+VEHICLE = Vehicle(2.83, 0.76, 0.5, 3.78) # L- H - b- a
 #veh= [0 -vehicle.H -vehicle.H; 0 -1 1];
 
 # Control noises
