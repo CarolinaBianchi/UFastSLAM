@@ -1,6 +1,6 @@
 """
-Odometry.
-The main method exposed is the "read" method, which returns the odometry information at time t.
+Control.
+The main method exposed is the "read" method, which returns the control signals at time t.
 Each time this method is called, an element of type Odometry is returned.
 """
 
@@ -10,37 +10,36 @@ SPEED       = "speed.txt"
 STEERING    = "steering.txt"
 TIME        = "time.txt"
 
-class Odometry:
+class Control:
     def __init__(self, speed, steering):
         self.speed = speed
         self.steering = steering
 
 
-class OdometryPublisher:
+class ControlPublisher:
     def __init__(self):
-        self.odometry = self.__read_odometry()
+        self.ctrls = self.__read_controls()
 
-    def __read_odometry(self):
+    def __read_controls(self):
         """
         Populates self.odometry, array of Odometry objects
         """
-        odoms={}
+        ctrls={}
         fspeed = open ( PATH + SPEED, 'r')
         fsteer = open ( PATH + STEERING, 'r')
         ftime  = open ( PATH + TIME, 'r')
 
-        odoms = {float(time) : Odometry(float(speed), float(steering)) for time, speed, steering in zip(ftime, fspeed, fsteer)}
+        ctrls = {float(time) : Control(float(speed), float(steering)) for time, speed, steering in zip(ftime, fspeed, fsteer)}
         fspeed.close()
         fspeed.close()
         ftime.close()
-        return odoms
+        return ctrls
 
     def read(self, time):
         """
-        Return the odometry information at time t.
+        Return the control information at time t.
         """
         try:
-            return self.odometry.pop(time)
+            return self.ctrls.pop(time)
         except Exception as e: #no measurements a time t
             return None
-odom = OdometryPublisher()

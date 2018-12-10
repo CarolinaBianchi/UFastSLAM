@@ -1,4 +1,4 @@
-from Odometry import *
+from Control import *
 from Particle import *
 from Sensor import *
 from Vehicle import *
@@ -25,17 +25,17 @@ def resample_particles(particles, N):
 def main():
 
     # Initialization
-    odom    = OdometryPublisher()
+    ctrl    = ControlPublisher()
     sensor  = Sensor()
     particles = init_particles(C.NPARTICLES)
 
     for i,t in enumerate(C.T):
-        odomData = odom.read(t)
+        ctrlData = ctrl.read(t)
 
-        if(odomData.speed != 0):
+        if(ctrlData.speed != 0):
             # Prediction
             for particle in particles:
-                particle.predictACFRu(odomData)
+                particle.predictACFRu(ctrlData)
 
             #Measurement
             z = sensor.read(t, C.T[i+1])

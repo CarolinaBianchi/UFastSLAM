@@ -3,7 +3,7 @@ A particle.
 """
 from numpy import zeros, eye
 from Sensor import ListSensorMeasurements, SensorMeasurement
-from Odometry import Odometry
+from Control import Control
 import Constants as C
 import copy
 
