@@ -1,7 +1,7 @@
 """
 A particle.
 """
-from math import tan,cos,sin,sqrt,atan2,pi
+from math import tan,cos,sin,sqrt,atan2,pi,exp
 import numpy as np
 from numpy import zeros, eye, linalg
 from Sensor import ListSensorMeasurements, SensorMeasurement
@@ -185,8 +185,11 @@ class Particle:
                 z_hati = z_hati + wg[k] * Ai[:,k] # predictive observation
             z_hati_rep = np.matlib.repmat(z_hati, 1, 2 * self.n_aug + 1)
             A[2 * i: 2 * i +1,:] = Ai - z_hati_rep
+            A_eval = zeros(np.size(A))
             for k in range(2 * n + 1):
-                A[2 * i: 2 * i + 1, k] = A[2 * i: 2 * i + 1, k] * wc_s[k]
+                # CHANGED WITH RESPECT MATLAB IMPLEMENTATION
+                A_eval[2 * i: 2 * i + 1, k] = A[2 * i: 2 * i + 1, k] * wc_s[k]
+
             z_hati[1] = pi_to_pi(z_hati[1]) # now use pi_to_pi for angle with respect car of possible landmark
             z_hat[2 * i: 2 * i + 1, 1] = z_hati
 
@@ -196,16 +199,36 @@ class Particle:
             R_aug[2 * i - 1: 2 * i, 2 * i - 1: 2 * i] = self.Re
 
         # innovation covariance (THERE IS AN ISSUE)
-        S = A * np.transpose(A) # vehicle uncertainty + map + measurement noise
+        S = A_eval * np.transpose(A) # vehicle uncertainty + map + measurement noise
         S = (S + np.transpose(S))*0.5 + R_aug  # make symmetric for better numerical stability
         # cross covariance: considering vehicle uncertainty
         X = zeros(dimv, 2 * n + 1) # stack
         for k in range(2 * n + 1):
             X[:,k] = wc_s[k] * (Ksi[:3, k] - self.xv)
-        U = X * np.transpose(A) # cross covariance ('dimv' by 'dimf * lenidf')
+        U = X * np.transpose(A) # cross covariance matrix ('dimv' by 'dimf * lenidf')
 
         # Kalman gain
         K = np.matmul(U, linalg.inv(S))
+
+        # innovation('dimf*lenidf' by 1)
+        v = z - z_hat
+        for i in range(lenidf):
+            v[2 * i] = pi_to_pi(v[2 * i])
+        # standard Kalman update
+        xv = self.xv + K * v
+        Pv = self.Pv - K * S * np.transpose(K)  # CHANGED WITH RESPECT MATLAB IMPLEMENTATION
+
+        # compute weight(parallel process): ERB for SLAM problem
+        Lt = S # square matrix of 'dimf*lenidf'
+        den = sqrt(2 * pi * linalg.det(Lt))
+        num = exp(-0.5 * np.transpose(v) * linalg.inv(Lt) * v) # TODO: CHANGE
+        w = num / den
+        self.w = self.w * w
+
+        # sample from proposal distribution
+        xvs = self.__multivariate_gauss(xv, Pv, 1)
+        self.xv = xvs
+        self.Pv = eye(3) * EPS # initialize covariance
 
     def feature_updateu(self):
         """
