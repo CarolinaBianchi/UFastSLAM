@@ -13,18 +13,6 @@ from Utils import pi_to_pi
 
 EPS = C.EPS
 
-def pi_to_pi(angle_array):
-    for angle in angle_array:
-        if angle > pi:
-            while angle > pi:
-                angle = angle - 2 * pi
-
-
-        elif angle < -pi:
-            while angle < -pi:
-                angle = angle + 2 * pi
-    return angle
-
 class Particle:
     #Static constant attributes
     Qe = C.Qe
@@ -49,7 +37,7 @@ class Particle:
     G = 0 #process noise of steering
 
     def __init__(self, weight, xv = zeros((3,1)), Pv = EPS*(eye(3)), Kaiy = np.empty([3, C.NPARTICLES]), \
-                xf = np.empty([2,0]), Pf = np.empty([2, 2, 0]), zf = np.empty([2, 0]), idf = np.empty([1, 0]), zn = np.empty([2, 0]) ):
+                xf = np.empty([2,0]), Pf = np.empty([2, 2, 0]), zf = np.empty([2, 0]), idf = np.empty([1, 0]), zn = [] ):
         self.w  = weight        # Initial weight
         self.xv = xv            # Initial vehicle pose
         self.Pv = Pv            # Initial robot covariance that considers a numerical error
@@ -68,11 +56,12 @@ class Particle:
         Modifies the particles predicted mean and covariance (xv, Pv), and sigma points (Kaiy).
         :param ctrl: object of type Control.
         """
-
-        dimv = np.size(self.xv, 0) # pose vehicle dimension
-        dimQ = np.size(self.Qe, 0) # measurement dimension
+        V = ctrl.speed
+        G = ctrl.steering
+        dimv = self.xv.shape[0] # pose vehicle dimension
+        dimQ = len(self.Qe) # measurement dimension
         # state augmentation: process noise only
-        x_aug = np.squeeze(np.append(self.xv , zeros((dimQ, 1)), axis = 0)) # to add control input and observation
+        x_aug = np.append(self.xv , zeros((dimQ, 1))) # to add control input and observation
 
         P_aug = np.append(
             np.append(self.Pv, zeros((dimv, dimQ)), axis = 1),
@@ -90,24 +79,27 @@ class Particle:
             Kaix[:, k + 1 + self.nr] = x_aug - S[:, k] # for k= L+1:2L
 
         Kaiy = zeros((dimv, 2 * self.nr + 1)) # array where the transformed sigma points saved with non augmented state
-        xv_p = zeros((3,1)) # new average state vehicle
-        Pv_p = zeros((3,3)) # new average covariance
+        xv_p = np.zeros((1, 3)) # new average state vehicle
+        Pv_p = np.zeros((3,3)) #[[0 for x in range(3)] for y in range(3)]
 
         for index, sigma_point in enumerate(Kaix.T):
-            Vn = self.V + sigma_point[3] # add process noise of linear speed if exists in Kaix
-            Gn = self.G + sigma_point[4] # add process noise of steering if exist in Kaix
+            Vn = V + sigma_point[3] # add process noise of linear speed if exists in Kaix
+            Gn = G + sigma_point[4] # add process noise of steering if exist in Kaix
 
             Vc = Vn / (1 - tan(Gn) * self.vehicle.H / self.vehicle.L) # tan of radians ; vehicle[1] --> H ; [0] --> L
 
-            Kaiy[0, index] = sigma_point[0] + self.dt * (Vc * cos(sigma_point[2]) - Vc / self.vehicle.L * tan(sigma_point[2]) * (
+            Kaiy[0, index] = sigma_point[0] + self.dt * (Vc * cos(sigma_point[2]) - Vc / self.vehicle.L * tan(Gn) * (
                         self.vehicle.a * sin(sigma_point[2]) + self.vehicle.b * cos(sigma_point[2])))
-            Kaiy[1, index] = sigma_point[1] + self.dt * (Vc * sin(sigma_point[2]) - Vc / self.vehicle.L * tan(sigma_point[2]) * (
+            Kaiy[1, index] = sigma_point[1] + self.dt * (Vc * sin(sigma_point[2]) + Vc / self.vehicle.L * tan(Gn) * (
                         self.vehicle.a * cos(sigma_point[2]) - self.vehicle.b * sin(sigma_point[2])))
             Kaiy[2, index] = sigma_point[2] + Vc * self.dt * tan(Gn) / self.vehicle.L
             xv_p = xv_p + self.wg[index] * Kaiy[:,index] # average calculated by giving certain weight each particle
-            Pv_p = Pv_p + self.wc[index] * (Kaiy[:,index] - xv_p)*np.transpose(Kaiy[:,index] - xv_p)
 
-        self.xv = xv_p
+        self.xv = xv_p.T
+        for index, sigma_point in enumerate(Kaix.T):
+            d = Kaiy[:,index] - xv_p
+            Pv_p = Pv_p + self.wc[index] * (d.T).dot(d)
+
         self.Pv = Pv_p
         self.Kaiy = Kaiy
 
@@ -123,7 +115,7 @@ class Particle:
         R = Particle.Re
         G_REJ = Particle.GATE_REJECT
         G_AUG = Particle.GATE_AUGMENT
-        zf, zn, idf = np.empty((2,1)),np.empty((2,1)),np.empty((2,1))
+        zf, zn, idf = [],[],[]
         Nf = size(self.xf, 1) # number of known features
         xv = self.xv
         zp = zeros((2, 1))
@@ -155,13 +147,13 @@ class Particle:
                         outer = nis
 
                 if jbest >=0:
-                    zf = np.append(zf, np.array([[meas.distance], [meas.angle]]), axis = 1)
-                    idf = np.append(idf, np.array([[idf], [jbest]]), axis = 1)
+                    zf.append([meas.distance, meas.angle])
+                    idf.append(jbest)
                 elif outer > G_AUG :
-                    zn = np.append(zn, np.array([[meas.distance], [meas.angle]]), axis = 1)
+                    zn.append([meas.distance, meas.angle])
 
 
-            self.zf, self.idf, self.zn = np.array(zf), np.array(idf), np.array(zn)
+            self.zf, self.idf, self.zn = np.array(zf), np.array(idf), np.array(zn).T
 
     def __compute_association_nis(self, z, R, idf):
         """
@@ -209,7 +201,7 @@ class Particle:
         #TO DO
         Compute proposal distribution and then sample from it.
         """
-        if len(self.zf)==0:
+        if size(self.zf)==0:
             return
         R = Particle.Re
         n = Particle.n_aug
@@ -218,7 +210,7 @@ class Particle:
         wc = Particle.wc_aug
 
         lenidf = np.size(self.idf) # number of currently observed features
-        dimv = np.size(self.xv) # vehicle state dimension
+        dimv = self.xv.shape[0] # vehicle state dimension
         dimf = np.size(self.zf) # feature state dimension
         z_hat = zeros((dimf * lenidf, 1)) # predictive observation
         z = zeros((dimf * lenidf, 1)) # sensory observation
@@ -230,7 +222,7 @@ class Particle:
             j = self.idf[i] # index of this observed feature
             xfi = self.xf[:,j] # get j-th feature mean
             Pfi = self.Pf[:,:,j] # get j-th feature cov.
-            z[2 * i : 2 * i + 1, 1] = self.zf[:,i] # stack of sensory observations
+            z[2 * i : 2 * i + 1, 0] = self.zf[:,i] # stack of sensory observations
 
             # state augmentation
             x_aug = np.append(self.xv, xfi, axis=0)  # to add control input and observation
@@ -290,7 +282,7 @@ class Particle:
         print(np.shape(self.xv), np.shape(Ksi[:3, 1] ))
         for k in range(2 * n + 1):
             X[:,k] = wc_s[k] * (Ksi[:3, k] - self.xv)
-        U = X * np.transpose(A) # cross covariance matrix ('dimv' by 'dimf * lenidf')
+        U = np.dot(X , np.transpose(A)) # cross covariance matrix ('dimv' by 'dimf * lenidf')
 
         # Kalman gain
         K = np.matmul(U, linalg.inv(S))
@@ -334,7 +326,7 @@ class Particle:
         if len(self.zn) == 0:
             return
 
-        if len(self.zf ==0): # Sample from proposal distribution, if we have not already done so above
+        if len(self.zf) != 0: # Sample from proposal distribution, if we have not already done so above
             self.xv = self.__multivariate_gauss(self.xv, self.Pv, 1)
             self.Pv = EPS * eye(3)
 

@@ -6,7 +6,7 @@ import Constants as C
 
 
 def init_particles(npart):
-    w = 1 / npart;
+    w = 1 / npart
     return [Particle(w) for i in range(npart)]
 
 
@@ -49,7 +49,7 @@ def stratified_resample(w):  # TODO: Check w is normalized
 
     ctr = 0
     for i in range(lenw):
-        while ctr < lenw and select[ctr] < w[i]
+        while ctr < lenw and select[ctr] < w[i]:
             keep[ctr] = i
             ctr = ctr + 1
     return keep, Neff
@@ -57,7 +57,8 @@ def stratified_resample(w):  # TODO: Check w is normalized
 
 def stratified_random(N):
     k = 1 / N
-    di = np.arange(k / 2, 1 - k / 2, k)  # deterministic intervals
+    #di = np.arange(k / 2, 1 - k / 2, k)  # deterministic intervals
+    di = np.arange(k / 2, 1, k)
     s = di + np.random.rand(N) * k - k / 2  # dither within interval
     return s
 
@@ -90,7 +91,7 @@ def main():
                 # Map update
                 particle.feature_updateu()
 
-            particles = resample_particles(particles, C.NEFFECTIVE);
+            particles = resample_particles(particles, C.NEFFECTIVE)
 
             # When new feautres are observed, augment it ot the map
             for particle in particles:
