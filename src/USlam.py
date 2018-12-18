@@ -32,9 +32,9 @@ def resample_particles(particles, Nmin):
 
     [keep, Neff] = stratified_resample(waux)
     if Neff <= Nmin:
-        particles = particles[keep]
         for i in range(N):
-            particles[i] = 1 / N
+            particles[i] = particles[keep[i]]
+            particles[i].w = 1 / N
 
     return particles
 
@@ -52,7 +52,7 @@ def stratified_resample(w):  # TODO: Check w is normalized
         while ctr < lenw and select[ctr] < w[i]:
             keep[ctr] = i
             ctr = ctr + 1
-    return keep, Neff
+    return keep.astype(int), Neff # return array of int's, if we remove astype would be array floats
 
 
 def stratified_random(N):
