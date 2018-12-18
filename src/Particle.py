@@ -3,6 +3,7 @@ A particle.
 """
 from math import tan,cos,sin,sqrt,atan2,pi,exp
 import numpy as np
+import numpy.matlib
 from numpy import zeros, eye, size, linalg
 from Sensor import ListSensorMeasurements, SensorMeasurement
 from Control import Control
@@ -218,36 +219,37 @@ class Particle:
         wc_s = np.sqrt(wc)
         A_eval = zeros(np.shape(A)) # CAROLINA HECTOR LOOK HERE IDK
         Ksi = zeros((self.n_aug, 2 * self.n_aug + 1)) # SAME
+        xfi = np.empty([2, 1])
         for i in range(lenidf):
             j = self.idf[i] # index of this observed feature
-            xfi = self.xf[:,j] # get j-th feature mean
+            xfi[:,0] = self.xf[:,j] # get j-th feature mean
             Pfi = self.Pf[:,:,j] # get j-th feature cov.
             z[2 * i : 2 * i + 1, 0] = self.zf[:,i] # stack of sensory observations
 
             # state augmentation
             x_aug = np.append(self.xv, xfi, axis=0)  # to add control input and observation
             P_aug = np.append(
-                np.append(self.Pv, zeros(dimv, dimf), axis=1),
-                np.append(zeros(dimf, dimv), Pfi, axis=1),
+                np.append(self.Pv, zeros((dimv, dimf)), axis=1),
+                np.append(zeros((dimf, dimv)), Pfi, axis=1),
                 axis=0
             )
             # set sigma points
             Ps = (self.n_aug +self.lambda_aug) * P_aug + EPS * eye(self.n_aug)
             Ss = np.transpose(linalg.cholesky(Ps))
-            Ksi = zeros(self.n_aug, 2 * self.n_aug + 1)
-            Ksi[:,0] = x_aug
+            Ksi = zeros((self.n_aug, 2 * self.n_aug + 1))
+            Ksi[:,0] = x_aug[:,0]
             for k in range(self.n_aug):
-                Ksi[:, k + 1] = x_aug + Ss[:,k]
-                Ksi[:, k + 1 + self.n_aug] = x_aug - Ss[:,k]
+                Ksi[:, k + 1] = x_aug[:,0] + Ss[:,k]
+                Ksi[:, k + 1 + self.n_aug] = x_aug[:,0] - Ss[:,k]
             # passing through observation model
-            Ai = zeros(dimf, 2 * n + 1) # dim (measurement, number particles)
+            Ai = zeros((dimf, 2 * n + 1)) # dim (measurement, number particles)
             bs = zeros(2 * n + 1) # bearing sign
-            z_hati = 0 # predicted observation('dimf' by 1)
+            z_hati = zeros((2,1)) # predicted observation('dimf' by 1)
             for k in range(2 * n + 1): # pass the sigma pts through the observation model
                 d = Ksi[dimv:, k] - Ksi[:dimv-1, k] # distance between particle and feature
                 r = linalg.norm(d) # range
-                bearing = atan2(d(2), d(1))
-                bs[k] = np.sign(bearing);
+                bearing = atan2(d[1], d[0])
+                bs[k] = np.sign(bearing)
                 if k > 1: # unify the sign
                     if bs[k] != bs[k-1]:
                         if bs[k] < 0 and -pi < bearing and bearing < -pi/2:
@@ -257,22 +259,23 @@ class Particle:
                             bearing = bearing - 2 * pi
                             bs[k] = np.sign(bearing)
                 # distance + angle ; bearing ** do not use pi_to_pi here **
-                Ai[:,k] = np.append(r,bearing - Ksi[dimv-1, k],axis = 0)
-                z_hati = z_hati + wg[k] * Ai[:,k] # predictive observation
+                Ai[:,k] = np.append(np.array([r]),np.array([bearing - Ksi[dimv-1, k]]),axis = 0)
+                z_hati[:,0] = z_hati[:,0] + wg[k] * Ai[:,k] # predictive observation
             z_hati_rep = np.matlib.repmat(z_hati, 1, 2 * self.n_aug + 1)
-            A[2 * i: 2 * i +1,:] = Ai - z_hati_rep
-            A_eval = zeros(np.size(A))
+            #z_hati_rep = np.matlib.repmat(z_hati, 1,self.n_aug)
+            A[2 * i: 2 * i +2,:] = Ai - z_hati_rep
+            A_eval = zeros(np.shape(A))
             for k in range(2 * n + 1):
                 # CHANGED WITH RESPECT MATLAB IMPLEMENTATION
-                A_eval[2 * i: 2 * i + 1, k] = A[2 * i: 2 * i + 1, k] * wc_s[k]
+                A_eval[2 * i: 2 * i + 2, k] = A[2 * i: 2 * i + 2, k] * wc_s[k]
 
             z_hati[1] = pi_to_pi(z_hati[1]) # now use pi_to_pi for angle with respect car of possible landmark
-            z_hat[2 * i: 2 * i + 1, 1] = z_hati
+            z_hat[2 * i: 2 * i + 2,:] = z_hati
 
         # augmented noise matrix
         R_aug = zeros((dimf * lenidf, dimf * lenidf))
         for i in range(lenidf):
-            R_aug[2 * i - 1: 2 * i, 2 * i - 1: 2 * i] = self.Re
+            R_aug[2 * i: 2 * i + 2, 2 * i: 2 * i + 2] = self.Re
 
         # innovation covariance (THERE IS AN ISSUE)
         S = np.dot(A_eval, np.transpose(A)) # vehicle uncertainty + map + measurement noise
@@ -281,7 +284,8 @@ class Particle:
         X = zeros((dimv, 2 * n + 1)) # stack
         print(np.shape(self.xv), np.shape(Ksi[:3, 1] ))
         for k in range(2 * n + 1):
-            X[:,k] = wc_s[k] * (Ksi[:3, k] - self.xv)
+            ksi_aux = Ksi[:3, k].reshape((3,1))
+            X[:,k] = np.squeeze(wc_s[k] * (ksi_aux - self.xv))
         U = np.dot(X , np.transpose(A)) # cross covariance matrix ('dimv' by 'dimf * lenidf')
 
         # Kalman gain
@@ -292,13 +296,13 @@ class Particle:
         for i in range(lenidf):
             v[2 * i] = pi_to_pi(v[2 * i])
         # standard Kalman update
-        xv = self.xv + K * v
-        Pv = self.Pv - K * S * np.transpose(K)  # CHANGED WITH RESPECT MATLAB IMPLEMENTATION
+        xv = self.xv + np.dot(K,v)
+        Pv = self.Pv - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
 
         # compute weight(parallel process): ERB for SLAM problem
         Lt = S # square matrix of 'dimf*lenidf'
         den = sqrt(2 * pi * linalg.det(Lt))
-        num = exp(-0.5 * np.transpose(v) * linalg.inv(Lt) * v) # TODO: CHANGE
+        num = exp(-0.5 * linalg.multi_dot([np.transpose(v), linalg.inv(Lt), v]))# TODO: CHANGE
         w = num / den
         self.w = self.w * w
 
