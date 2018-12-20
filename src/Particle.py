@@ -9,7 +9,7 @@ from Sensor import ListSensorMeasurements, SensorMeasurement
 from Control import Control
 import Constants as C
 import copy
-from math import sin, cos
+from math import sin, cos, nan
 from Utils import pi_to_pi
 
 EPS = C.EPS
@@ -212,7 +212,8 @@ class Particle:
 
         lenidf = np.size(self.idf) # number of currently observed features
         dimv = self.xv.shape[0] # vehicle state dimension
-        dimf = np.size(self.zf) # feature state dimension
+        dimf = self.zf.shape[1] # feature state dimension
+        # TODO: Why self.zf provides info in row format and not in columns?
         z_hat = zeros((dimf * lenidf, 1)) # predictive observation
         z = zeros((dimf * lenidf, 1)) # sensory observation
         A = zeros((dimf * lenidf, 2 * self.n_aug + 1)) # stack of innovation covariance for vehicle uncertainty
@@ -224,7 +225,8 @@ class Particle:
             j = self.idf[i] # index of this observed feature
             xfi[:,0] = self.xf[:,j] # get j-th feature mean
             Pfi = self.Pf[:,:,j] # get j-th feature cov.
-            z[2 * i : 2 * i + 1, 0] = self.zf[:,i] # stack of sensory observations
+            # TODO: Check why zf had dimension num_obs x 2 instead of 2 x num_obs
+            z[2 * i : 2 * i + 2, 0] = self.zf[i,:] # stack of sensory observations
 
             # state augmentation
             x_aug = np.append(self.xv, xfi, axis=0)  # to add control input and observation
@@ -255,7 +257,7 @@ class Particle:
                         if bs[k] < 0 and -pi < bearing and bearing < -pi/2:
                             bearing = bearing + 2 * pi
                             bs[k] = np.sign(bearing)
-                        elif bs(k) > 0 and pi/2 < bearing and bearing < pi:
+                        elif bs[k] > 0 and pi/2 < bearing and bearing < pi:
                             bearing = bearing - 2 * pi
                             bs[k] = np.sign(bearing)
                 # distance + angle ; bearing ** do not use pi_to_pi here **
