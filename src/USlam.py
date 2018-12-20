@@ -41,7 +41,7 @@ def resample_particles(particles, Nmin):
     [keep, Neff] = stratified_resample(waux)
     if Neff <= Nmin:
         for i in range(N):
-            particles[i] = particles[keep[i]]
+            particles[i] = particles[keep[i]].deepcopy()
             particles[i].w = 1 / N
 
     return particles
