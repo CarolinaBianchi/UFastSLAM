@@ -3,6 +3,13 @@ from Particle import *
 from Sensor import *
 from Vehicle import *
 import Constants as C
+from Utils import pi_to_pi
+
+from math import sin, cos, nan
+
+import numpy as np
+from numpy import zeros, eye, size, linalg
+
 
 
 def init_particles(npart):
@@ -62,12 +69,83 @@ def stratified_random(N):
     s = di + np.random.rand(N) * k - k / 2  # dither within interval
     return s
 
+def make_laser_lines(rb, xv):
+    if not rb:
+        p = []
+        return
+    len_ = len(rb)
+    lnes_x = np.zeros((1, len_)) + xv[0]
+    lnes_y = np.zeros((1, len_)) + xv[1]
+    # TODO: Check rb structure
+    lnes_angle = TransformToGlobal([rb[0]*np.array(cos(rb[1,:])), rb[0,:]*np.array(sin(rb[1,:]))], xv)
+    lnes = np.append([lnes_x, lnes_y, lnes_angle], axis = 0)
+    p = line_plot_conversion(lnes)
+
+def TransformToGlobal(p, b):
+    # Transform a list of poses [x;y;phi] so that they are global wrt a base pose
+    # rotate
+    rot = zeros((2, 2))
+    rot[0,0] = cos(b[2])
+    rot[0,1] = -sin(b[2])
+    rot[1,0] = sin(b[2])
+    rot[1,1] = cos(b[2])
+    p[0:2,:] = rot*p[0:2,:]
+
+    # translate
+    p[0,:] = p[0,:] + b[0]
+    p[1,:] = p[1,:] + b[1]
+
+    # if p is a pose and not a point
+    if p.shape[0] == 3:
+       p[2,:] = pi_to_pi(p[2,:] + b[2])
+    return p
+
+def line_plot_conversion(lne):
+    """
+    INPUT: list of lines[x1; y1; x2; y2]
+    OUTPUT: list of points[x; y]
+    ----------------------------------
+    Convert a list of lines so that they will be plotted as a set of unconnected lines but only require a single handle
+    to do so. This is performed by converting the lines to a set of points, where a NaN point is inserted between
+    every point-pair
+    """
+    len = lne.shape[1] * 3 - 1
+    p = zeros((2, len))
+
+    p[:, ::3] = lne[0: 2,:]
+    p[:,1::3] = lne[2: 4,:]
+    p[:, 2::3] = nan
+    return p
+
+def get_epath(particles, epath, NPARTICLES):
+    # vehicle state estimation result
+    xvp = [particle.xv for particle in particles]
+    w = [particle.w for particle in particles]
+    ws = np.sum(w)
+    w = w / ws # normalize
+
+    # weighted mean vehicle pose
+    xvmean = 0
+    for i in range(NPARTICLES):
+        xvmean = xvmean + w[i] * xvp[i]
+
+    # keep the pose for recovering estimation trajectory
+    return epath, xvmean
+
+def do_plot(particles, plines, epath):
+    xvp = [particle.xv for particle in particles]
+    xfp = [particle.xf for particle in particles]
+    w = [particle.w for particle in particles]
+    ii = np.where(w == max(w))[0]
+    # TODO: Add animations
 
 def main():
     # Initialization
     ctrl = ControlPublisher()
     sensor = Sensor()
     particles = init_particles(C.NPARTICLES)
+    epath = []
+    plines = zeros((2, 1))
     for i, t in enumerate(C.T):
         ctrlData = ctrl.read(t)
 
@@ -78,6 +156,10 @@ def main():
 
             # Measurement
             z = sensor.read(t, C.T[i + 1])
+
+            # TODO: Plot laser lines
+            #if z:
+                #plines = make_laser_lines(z, particles[1].xv) # use the first particle for drawing the laser line
 
             # Data associations
             for particle in particles:
@@ -96,6 +178,9 @@ def main():
             # When new feautres are observed, augment it ot the map
             for particle in particles:
                 particle.augment_map()
+
+            #epath = get_epath(particles, epath, C.NPARTICLES)
+            #do_plot(particles, plines, epath);
 
 
 if __name__ == "__main__":
