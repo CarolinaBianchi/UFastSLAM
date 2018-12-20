@@ -80,11 +80,12 @@ class Sensor:
                     continue
 
                 if(next.time >= t1 and next.time<t2):
+                    l.append(self.measurements.pop(0))
                     # TODO: As always appends 18 measurements per timestep even though some of the have distance 0 and angle < 10^6
-                    for i in range(len(next.list)):
-                        if next.list[i].distance!=0:
-                            l.append(next.list[i])
-                    self.measurements.pop(0)
+                    #for i in range(len(next.list)):
+                    #    if next.list[i].distance!=0:
+                    #        l.append(next.list[i])
+                    #self.measurements.pop(0)
                 else:
                     break
         except: # no more measurements

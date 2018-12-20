@@ -121,40 +121,40 @@ class Particle:
         xv = self.xv
         zp = zeros((2, 1))
 
-        for list in z:
-            for meas in list.list: # Find the nearest feature
-                jbest = -1;
-                outer = float("inf")
-                if Nf != 0 :
-                    dmin = float("inf")
-                    jbest_s = -1
+        for meas in z:
 
-                    for j in range(Nf):  # For any known feature
-                        dx = self.xf[0,j]-xv[0]
-                        dy = self.xf[1,j]-xv[1]
-                        d = sqrt(dx**2 + dy**2)             # Distance vehicle-feaure
-                        ang = pi_to_pi(atan2(dy, dx)-xv[2])
-                        v = np.array([[meas.distance - d],[pi_to_pi(meas.angle-ang)]])
-                        d2 = np.dot(np.transpose(v),v)
-                        if(d2 < dmin):
-                            dmin = d2
-                            jbest_s = j
+            jbest = -1;
+            outer = float("inf")
+            if Nf != 0 :
+                dmin = float("inf")
+                jbest_s = -1
 
-                    # Malahanobis test for the candidate neighbour
-                    nis = self.__compute_association_nis(meas, R, jbest_s) #nearest neighbor
-                    if nis < G_REJ :    # if within gate, store nearest neighbor
-                        jbest = jbest_s;
-                    elif nis < G_AUG :  # else store best nis value
-                        outer = nis
+                for j in range(Nf):  # For any known feature
+                    dx = self.xf[0,j]-xv[0]
+                    dy = self.xf[1,j]-xv[1]
+                    d = sqrt(dx**2 + dy**2)             # Distance vehicle-feaure
+                    ang = pi_to_pi(atan2(dy, dx)-xv[2])
+                    v = np.array([[meas.distance - d],[pi_to_pi(meas.angle-ang)]])
+                    d2 = np.dot(np.transpose(v),v)
+                    if(d2 < dmin):
+                        dmin = d2
+                        jbest_s = j
 
-                if jbest >=0:
-                    zf.append([meas.distance, meas.angle])
-                    idf.append(jbest)
-                elif outer > G_AUG :
-                    zn.append([meas.distance, meas.angle])
+                # Malahanobis test for the candidate neighbour
+                nis = self.__compute_association_nis(meas, R, jbest_s) #nearest neighbor
+                if nis < G_REJ :    # if within gate, store nearest neighbor
+                    jbest = jbest_s
+                elif nis < G_AUG :  # else store best nis value
+                    outer = nis
+
+            if jbest >=0:
+                zf.append([meas.distance, meas.angle])
+                idf.append(jbest)
+            elif outer > G_AUG :
+                zn.append([meas.distance, meas.angle])
 
 
-            self.zf, self.idf, self.zn = np.array(zf), np.array(idf), np.array(zn).T
+        self.zf, self.idf, self.zn = np.array(zf), np.array(idf), np.array(zn).T
 
     def __compute_association_nis(self, z, R, idf):
         """

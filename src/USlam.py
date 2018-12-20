@@ -2,6 +2,7 @@ from Control import *
 from Particle import *
 from Sensor import *
 from Vehicle import *
+from FrontEnd import *
 import Constants as C
 from Utils import pi_to_pi
 
@@ -155,7 +156,7 @@ def main():
                 particle.predictACFRu(ctrlData)
 
             # Measurement
-            z = sensor.read(t, C.T[i + 1])
+            z = FrontEnd.filter(sensor.read(t, C.T[i + 1]))
 
             # TODO: Plot laser lines
             #if z:

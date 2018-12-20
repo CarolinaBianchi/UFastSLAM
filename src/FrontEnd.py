@@ -12,6 +12,6 @@ class FrontEnd:
         if (len(listMeasurements) == 0):
             return listMeasurements
 
-        filtered = [[meas for meas in l.list if meas.distance!=0 and meas.distance <LIMIT ] for l in lisMeasurements]
+        filtered = [meas for l in listMeasurements for meas in l.list if meas.distance != 0 and meas.distance < LIMIT]
         #TO DO!!!! meas.angle= meas.angle - pi/2
         return filtered
