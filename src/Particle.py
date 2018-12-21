@@ -198,7 +198,7 @@ class Particle:
             return
         R = Particle.Re
         n = Particle.n_aug
-        lmb = Particle.lambda_aug
+        #lmb = Particle.lambda_aug
         wg = Particle.wg_aug
         wc = Particle.wc_aug
 
@@ -210,8 +210,6 @@ class Particle:
         z = zeros((dimf * lenidf, 1)) # sensory observation
         A = zeros((dimf * lenidf, 2 * self.n_aug + 1)) # stack of innovation covariance for vehicle uncertainty
         wc_s = np.sqrt(wc)
-        A_eval = zeros(np.shape(A)) # CAROLINA HECTOR LOOK HERE IDK
-        Ksi = zeros((self.n_aug, 2 * self.n_aug + 1)) # SAME
         xfi = np.empty([2, 1])
         for i in range(lenidf):
             j = self.idf[i] # index of this observed feature
@@ -244,7 +242,7 @@ class Particle:
                 r = linalg.norm(d) # range
                 bearing = atan2(d[1], d[0])
                 bs[k] = np.sign(bearing)
-                if k > 1: # unify the sign
+                if k > 0: # unify the sign
                     if bs[k] != bs[k-1]:
                         if bs[k] < 0 and -pi < bearing and bearing < -pi/2:
                             bearing = bearing + 2 * pi
@@ -256,7 +254,6 @@ class Particle:
                 Ai[:,k] = np.append(np.array([r]),np.array([bearing - Ksi[dimv-1, k]]),axis = 0)
                 z_hati[:,0] = z_hati[:,0] + wg[k] * Ai[:,k] # predictive observation of known feature from current pose
             z_hati_rep = np.matlib.repmat(z_hati, 1, 2 * self.n_aug + 1)
-            #z_hati_rep = np.matlib.repmat(z_hati, 1,self.n_aug)
             A[2 * i: 2 * i +2,:] = Ai - z_hati_rep # real distance with respect centre - avergae distance
             A_eval = zeros(np.shape(A))
             for k in range(2 * n + 1):
