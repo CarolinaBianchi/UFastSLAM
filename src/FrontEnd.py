@@ -14,4 +14,6 @@ class FrontEnd:
 
         filtered = [meas for l in listMeasurements for meas in l.list if meas.distance != 0 and meas.distance < LIMIT]
         #TO DO!!!! meas.angle= meas.angle - pi/2
+        for meas in filtered:
+            meas.angle = meas.angle - pi/2
         return filtered

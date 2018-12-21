@@ -177,22 +177,14 @@ class Particle:
         #for i in range(len(idf)): #WHY WAS MATLAB CODE LIKE THAT??
         dx = xf[0] - xv[0]
         dy = xf[1] - xv[1]
-        d2 = sqrt(dx**2 + dy**2)
+        d2 = dx**2 + dy**2
         d = sqrt(d2)
         zp = np.array([d,pi_to_pi(atan2(dy, dx)-xv[2])]) # predicted measure from car frame to the feature
-        if(d < 1e-15):
-            #print("Something's wrong")
-            #Temporary dirty, this should get fixed when the implementation
-            #is completed
-            Hv = np.array([[-500, -500, 0],
-                            [500, -500, -1]])
-            Hf = np.array([[500, 500],
-                        [-500, 500]])
-        else:
-            Hv = np.array(  [[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
-                            [dy/d2, -dx/d2, -1]])
-            Hf = np.array([[dx/d, dy/d],                       # Jacobian wrt feature states
-                            [-dy/d2, dx/d2]])
+
+        Hv = np.array(  [[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
+                        [dy/d2, -dx/d2, -1]])
+        Hf = np.array([[dx/d, dy/d],                       # Jacobian wrt feature states
+                        [-dy/d2, dx/d2]])
         Sf = np.dot(np.dot(np.squeeze(Hf), Pf), np.transpose(np.squeeze(Hf))) + R
         Sv = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
         return (zp, Hv, Hf, Sf, Sv)
@@ -299,10 +291,11 @@ class Particle:
             v[2 * i] = pi_to_pi(v[2 * i])
         # standard Kalman update
         xv = self.xv + np.dot(K,v)
-        Pv = self.Pv - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
+        Pv = self.Pv - np.dot(K, U.T) # same as - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
 
         # compute weight(parallel process): ERB for SLAM problem
-        Lt = linalg.multi_dot([np.transpose(U), linalg.inv(Pv), U]) + S # square matrix of 'dimf*lenidf'
+        Lt = S
+        #Lt = linalg.multi_dot([np.transpose(U), linalg.inv(Pv), U]) + S # square matrix of 'dimf*lenidf'
         den = sqrt(2 * pi * linalg.det(Lt)) # TODO: LT SOMETIMES NEGATIVE !!!!!!!! eq. 25 in the paper
         num = exp(-0.5 * linalg.multi_dot([np.transpose(v), linalg.inv(Lt), v]))
         w = num / den
