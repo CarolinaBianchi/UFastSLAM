@@ -23,7 +23,7 @@ class Particle:
     lambda_r = C.lambda_r
     wg = C.wg_r
     wc = C.wc_r
-    Re = C.Re
+    Re = C.Re # Observation(measurement) noises covariance
     GATE_REJECT = C.GATE_REJECT
     GATE_AUGMENT = C.GATE_AUGMENT_NN
     n_aug = C.n_aug # dimv + dimf
@@ -43,7 +43,7 @@ class Particle:
         self.xv = xv            # Initial vehicle pose
         self.Pv = Pv            # Initial robot covariance that considers a numerical error
         self.Kaiy = Kaiy        # Temporal keeping for a following measurement update
-        self.xf = xf            # Feature mean states
+        self.xf = xf            # Feature mean states -- in global coordinates
         self.Pf = Pf            # Feature covariances
         self.zf = zf            # Known feature locations
         self.idf = idf          # Known feature index
@@ -60,7 +60,7 @@ class Particle:
         V = ctrl.speed
         G = ctrl.steering
         dimv = self.xv.shape[0] # pose vehicle dimension
-        dimQ = len(self.Qe) # measurement dimension
+        dimQ = len(self.Qe) # measurement dimension; Qe [variance speed ,0 ; 0, variance steering]
         # state augmentation: process noise only
         x_aug = np.append(self.xv , zeros((dimQ, 1))) # to add control input and observation
 
@@ -123,14 +123,14 @@ class Particle:
 
         for meas in z:
 
-            jbest = -1;
+            jbest = -1
             outer = float("inf")
             if Nf != 0 :
                 dmin = float("inf")
                 jbest_s = -1
 
                 for j in range(Nf):  # For any known feature
-                    dx = self.xf[0,j]-xv[0]
+                    dx = self.xf[0,j]-xv[0] # distance_x between known feature and current car pose
                     dy = self.xf[1,j]-xv[1]
                     d = sqrt(dx**2 + dy**2)             # Distance vehicle-feaure
                     ang = pi_to_pi(atan2(dy, dx)-xv[2])
@@ -138,7 +138,7 @@ class Particle:
                     d2 = np.dot(np.transpose(v),v)
                     if(d2 < dmin):
                         dmin = d2
-                        jbest_s = j
+                        jbest_s = j # put it the index of the known feature more probable
 
                 # Malahanobis test for the candidate neighbour
                 nis = self.__compute_association_nis(meas, R, jbest_s) #nearest neighbor
@@ -147,10 +147,10 @@ class Particle:
                 elif nis < G_AUG :  # else store best nis value
                     outer = nis
 
-            if jbest >=0:
+            if jbest >= 0:
                 zf.append([meas.distance, meas.angle])
                 idf.append(jbest)
-            elif outer > G_AUG :
+            elif outer > G_AUG : # if no features saved yet it will get inside here
                 zn.append([meas.distance, meas.angle])
 
 
@@ -179,7 +179,7 @@ class Particle:
         dy = xf[1] - xv[1]
         d2 = sqrt(dx**2 + dy**2)
         d = sqrt(d2)
-        zp = np.array([d,pi_to_pi(atan2(dy, dx)-xv[2])]) # predicted
+        zp = np.array([d,pi_to_pi(atan2(dy, dx)-xv[2])]) # predicted measure from car frame to the feature
         if(d < 1e-15):
             #print("Something's wrong")
             #Temporary dirty, this should get fixed when the implementation
@@ -191,9 +191,9 @@ class Particle:
         else:
             Hv = np.array(  [[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
                             [dy/d2, -dx/d2, -1]])
-            Hf = np.array([[dx/d, dy/d],
+            Hf = np.array([[dx/d, dy/d],                       # Jacobian wrt feature states
                             [-dy/d2, dx/d2]])
-        Sf = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
+        Sf = np.dot(np.dot(np.squeeze(Hf), Pf), np.transpose(np.squeeze(Hf))) + R
         Sv = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
         return (zp, Hv, Hf, Sf, Sv)
 
@@ -229,14 +229,14 @@ class Particle:
             z[2 * i : 2 * i + 2, 0] = self.zf[i,:] # stack of sensory observations
 
             # state augmentation
-            x_aug = np.append(self.xv, xfi, axis=0)  # to add control input and observation
+            x_aug = np.append(self.xv, xfi, axis=0)  # to add control input and observation that agree with known features
             P_aug = np.append(
                 np.append(self.Pv, zeros((dimv, dimf)), axis=1),
                 np.append(zeros((dimf, dimv)), Pfi, axis=1),
                 axis=0
             )
             # set sigma points
-            Ps = (self.n_aug +self.lambda_aug) * P_aug + EPS * eye(self.n_aug)
+            Ps = (self.n_aug + self.lambda_aug) * P_aug + EPS * eye(self.n_aug)
             Ss = np.transpose(linalg.cholesky(Ps))
             Ksi = zeros((self.n_aug, 2 * self.n_aug + 1))
             Ksi[:,0] = x_aug[:,0]
@@ -248,7 +248,7 @@ class Particle:
             bs = zeros(2 * n + 1) # bearing sign
             z_hati = zeros((2,1)) # predicted observation('dimf' by 1)
             for k in range(2 * n + 1): # pass the sigma pts through the observation model
-                d = Ksi[dimv:, k] - Ksi[:dimv-1, k] # distance between particle and feature
+                d = Ksi[dimv:, k] - Ksi[:dimv-1, k] # distance between particle and feature saved before
                 r = linalg.norm(d) # range
                 bearing = atan2(d[1], d[0])
                 bs[k] = np.sign(bearing)
@@ -262,10 +262,10 @@ class Particle:
                             bs[k] = np.sign(bearing)
                 # distance + angle ; bearing ** do not use pi_to_pi here **
                 Ai[:,k] = np.append(np.array([r]),np.array([bearing - Ksi[dimv-1, k]]),axis = 0)
-                z_hati[:,0] = z_hati[:,0] + wg[k] * Ai[:,k] # predictive observation
+                z_hati[:,0] = z_hati[:,0] + wg[k] * Ai[:,k] # predictive observation of known feature from current pose
             z_hati_rep = np.matlib.repmat(z_hati, 1, 2 * self.n_aug + 1)
             #z_hati_rep = np.matlib.repmat(z_hati, 1,self.n_aug)
-            A[2 * i: 2 * i +2,:] = Ai - z_hati_rep
+            A[2 * i: 2 * i +2,:] = Ai - z_hati_rep # real distance with respect centre - avergae distance
             A_eval = zeros(np.shape(A))
             for k in range(2 * n + 1):
                 # CHANGED WITH RESPECT MATLAB IMPLEMENTATION
@@ -284,14 +284,14 @@ class Particle:
         S = (S + np.transpose(S))*0.5 + R_aug  # make symmetric for better numerical stability
         # cross covariance: considering vehicle uncertainty
         X = zeros((dimv, 2 * n + 1)) # stack
-        print(np.shape(self.xv), np.shape(Ksi[:3, 1] ))
+        #print(np.shape(self.xv), np.shape(Ksi[:3, 1] ))
         for k in range(2 * n + 1):
             ksi_aux = Ksi[:3, k].reshape((3,1))
             X[:,k] = np.squeeze(wc_s[k] * (ksi_aux - self.xv))
         U = np.dot(X , np.transpose(A)) # cross covariance matrix ('dimv' by 'dimf * lenidf')
 
         # Kalman gain
-        K = np.matmul(U, linalg.inv(S))
+        K = np.dot(U, linalg.inv(S))
 
         # innovation('dimf*lenidf' by 1)
         v = z - z_hat
@@ -302,9 +302,9 @@ class Particle:
         Pv = self.Pv - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
 
         # compute weight(parallel process): ERB for SLAM problem
-        Lt = S # square matrix of 'dimf*lenidf'
-        den = sqrt(2 * pi * linalg.det(Lt))
-        num = exp(-0.5 * linalg.multi_dot([np.transpose(v), linalg.inv(Lt), v]))# TODO: CHANGE
+        Lt = linalg.multi_dot([np.transpose(U), linalg.inv(Pv), U]) + S # square matrix of 'dimf*lenidf'
+        den = sqrt(2 * pi * linalg.det(Lt)) # TODO: LT SOMETIMES NEGATIVE !!!!!!!! eq. 25 in the paper
+        num = exp(-0.5 * linalg.multi_dot([np.transpose(v), linalg.inv(Lt), v]))
         w = num / den
         self.w = self.w * w
 
@@ -320,7 +320,7 @@ class Particle:
         and without pose uncertainty.
         Modifies particles xf and Pf.
         """
-        if len(self.zf)==0:
+        if size(self.zf) == 0:
             return
         R = Particle.Re
         N = Particle.n_f_a
@@ -329,10 +329,11 @@ class Particle:
         wc_f_a = Particle.wc_f_a
 
     def augment_map(self):
-        if len(self.zn) == 0:
+        if len(self.zn) == 0: # new features seen that are not still saved
             return
 
-        if len(self.zf) != 0: # Sample from proposal distribution, if we have not already done so above
+        if len(self.zf) != 0: # Sample from proposal distribution, if we have not already done so above. Gets inside
+            # if already features saved
             self.xv = self.__multivariate_gauss(self.xv, self.Pv, 1)
             self.Pv = EPS * eye(3)
 
@@ -370,7 +371,7 @@ class Particle:
                   [s,  r*c]]
             Pf[:,:,i] = np.dot(np.dot(Gz, R),np.transpose(Gz))
 
-        self.xf = np.concatenate((self.xf,xf), 1)
+        self.xf = np.concatenate((self.xf,xf), 1) # concatenate in Feature mean states
         self.Pf = np.concatenate((self.Pf, Pf), 2)
 
     def deepcopy(self):
