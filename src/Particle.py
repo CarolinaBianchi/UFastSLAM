@@ -194,8 +194,8 @@ class Particle:
         #TO DO
         Compute proposal distribution and then sample from it.
         """
-        if size(self.zf)==0:
-            return
+        #if size(self.zf)==0:
+        #    return
         R = Particle.Re
         n = Particle.n_aug
         #lmb = Particle.lambda_aug
@@ -209,6 +209,7 @@ class Particle:
         z_hat = zeros((dimf * lenidf, 1)) # predictive observation
         z = zeros((dimf * lenidf, 1)) # sensory observation
         A = zeros((dimf * lenidf, 2 * self.n_aug + 1)) # stack of innovation covariance for vehicle uncertainty
+        A_eval = zeros(np.shape(A))
         wc_s = np.sqrt(wc)
         xfi = np.empty([2, 1])
         for i in range(lenidf):
@@ -227,7 +228,8 @@ class Particle:
             )
             # set sigma points
             Ps = (self.n_aug + self.lambda_aug) * P_aug + EPS * eye(self.n_aug)
-            Ss = np.transpose(linalg.cholesky(Ps))
+            #Ss = np.transpose(linalg.cholesky(Ps))
+            Ss = linalg.cholesky(Ps)
             Ksi = zeros((self.n_aug, 2 * self.n_aug + 1))
             Ksi[:,0] = x_aug[:,0]
             for k in range(self.n_aug):
@@ -255,11 +257,11 @@ class Particle:
                 z_hati[:,0] = z_hati[:,0] + wg[k] * Ai[:,k] # predictive observation of known feature from current pose
             z_hati_rep = np.matlib.repmat(z_hati, 1, 2 * self.n_aug + 1)
             A[2 * i: 2 * i +2,:] = Ai - z_hati_rep # real distance with respect centre - avergae distance
-            A_eval = zeros(np.shape(A))
+
             for k in range(2 * n + 1):
                 # CHANGED WITH RESPECT MATLAB IMPLEMENTATION
                 A_eval[2 * i: 2 * i + 2, k] = A[2 * i: 2 * i + 2, k] * wc_s[k]
-
+                
             z_hati[1] = pi_to_pi(z_hati[1]) # now use pi_to_pi for angle with respect car of possible landmark
             z_hat[2 * i: 2 * i + 2,:] = z_hati
 
@@ -269,7 +271,7 @@ class Particle:
             R_aug[2 * i: 2 * i + 2, 2 * i: 2 * i + 2] = self.Re
 
         # innovation covariance (THERE IS AN ISSUE)
-        S = np.dot(A_eval, np.transpose(A)) # vehicle uncertainty + map + measurement noise
+        S = np.dot(A_eval, np.transpose(A_eval)) # vehicle uncertainty + map + measurement noise
         S = (S + np.transpose(S))*0.5 + R_aug  # make symmetric for better numerical stability
         # cross covariance: considering vehicle uncertainty
         X = zeros((dimv, 2 * n + 1)) # stack
@@ -277,7 +279,7 @@ class Particle:
         for k in range(2 * n + 1):
             ksi_aux = Ksi[:3, k].reshape((3,1))
             X[:,k] = np.squeeze(wc_s[k] * (ksi_aux - self.xv))
-        U = np.dot(X , np.transpose(A)) # cross covariance matrix ('dimv' by 'dimf * lenidf')
+        U = np.dot(X , np.transpose(A_eval)) # cross covariance matrix ('dimv' by 'dimf * lenidf')
 
         # Kalman gain
         K = np.dot(U, linalg.inv(S))
@@ -288,7 +290,7 @@ class Particle:
             v[2 * i] = pi_to_pi(v[2 * i])
         # standard Kalman update
         xv = self.xv + np.dot(K,v)
-        Pv = self.Pv - np.dot(K, U.T) # same as - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
+        Pv = self.Pv - np.dot(K, U.T) # same as - Pv1 = self.Pv - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
 
         # compute weight(parallel process): ERB for SLAM problem
         Lt = S
@@ -299,7 +301,7 @@ class Particle:
         self.w = self.w * w
 
         # sample from proposal distribution
-        xvs = self.__multivariate_gauss(xv, Pv, 1)
+        xvs = self.__multivariate_gauss(xv, Pv)
         self.xv = xvs
         self.Pv = eye(3) * EPS # initialize covariance
 
@@ -319,27 +321,20 @@ class Particle:
         wc_f_a = Particle.wc_f_a
 
     def augment_map(self):
-        if len(self.zn) == 0: # new features seen that are not still saved
-            return
-
-        if len(self.zf) != 0: # Sample from proposal distribution, if we have not already done so above. Gets inside
+        #if len(self.zn) != 0: # new features seen that are not still saved
+        if len(self.zf) == 0: # Sample from proposal distribution, if we have not already done so above. Gets inside
             # if already features saved
-            self.xv = self.__multivariate_gauss(self.xv, self.Pv, 1)
+            self.xv = self.__multivariate_gauss(self.xv, self.Pv)
             self.Pv = EPS * eye(3)
-
         self.__add_feature()
 
-    def __multivariate_gauss(self,x, P, n):
+    def __multivariate_gauss(self,x, P):
         """
         Random sample from multivariate Gaussian distribution.
         :param x: mean vector
         :param P: covariance
-        :param n: number of samples
         """
-        samples = zeros((np.size(P,0), n))
-        for i in range(n):
-            samples[:,i] = np.random.multivariate_normal(np.squeeze(x), P)
-        return samples
+        return np.random.multivariate_normal(np.squeeze(x), P)
 
     def __add_feature(self):
         """

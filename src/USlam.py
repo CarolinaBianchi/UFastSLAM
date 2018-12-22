@@ -158,27 +158,30 @@ def main():
             # Measurement
             z = FrontEnd.filter(sensor.read(t, C.T[i + 1]))
 
-            # TODO: Plot laser lines
-            #if z:
-                #plines = make_laser_lines(z, particles[1].xv) # use the first particle for drawing the laser line
+            if z:
+                # TODO: Plot laser lines
+                #if z:
+                    #plines = make_laser_lines(z, particles[1].xv) # use the first particle for drawing the laser line
 
-            # Data associations
-            for particle in particles:
-                particle.data_associateNN(z)
+                # Data associations
+                for particle in particles:
+                    particle.data_associateNN(z)
 
-            # Known map features
-            for particle in particles:
-                # Sample from optimal proposal distribution
-                particle.sample_proposaluf()
+                # Known map features
+                for particle in particles:
+                    # Sample from optimal proposal distribution
+                    if particle.zf.size:
+                        particle.sample_proposaluf()
 
-                # Map update
-                particle.feature_updateu()
+                        # Map update
+                        particle.feature_updateu()
 
-            particles = resample_particles(particles, C.NEFFECTIVE)
+                particles = resample_particles(particles, C.NEFFECTIVE)
 
-            # When new feautres are observed, augment it ot the map
-            for particle in particles:
-                particle.augment_map()
+                # When new feautres are observed, augment it ot the map
+                for particle in particles:
+                    if particle.zn.size:
+                        particle.augment_map()
 
             #epath = get_epath(particles, epath, C.NPARTICLES)
             #do_plot(particles, plines, epath);
