@@ -10,6 +10,9 @@ from math import sin, cos, nan
 
 import numpy as np
 from numpy import zeros, eye, size, linalg
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
+
 
 
 
@@ -131,7 +134,11 @@ def get_epath(particles, epath, NPARTICLES):
         xvmean = xvmean + w[i] * xvp[i]
 
     # keep the pose for recovering estimation trajectory
-    return epath, xvmean
+    return [epath, xvmean]
+
+def init_animation():
+    # Initialize animation
+
 
 def do_plot(particles, plines, epath):
     xvp = [particle.xv for particle in particles]
@@ -139,6 +146,23 @@ def do_plot(particles, plines, epath):
     w = [particle.w for particle in particles]
     ii = np.where(w == max(w))[0]
     # TODO: Add animations
+    fig = plt.figure()
+    fig.add_axes([-150, 250, -100, 250])
+    fig.xlabel('[m]')
+    fig.ylabel('[m]')
+    ani = animation.FuncAnimation(fig, animate, init_func=init_animation, interval=2, blit=True, save_count=50)
+
+    if xvp:
+        set(h.xvp, 'xdata', xvp[0,:], 'ydata', xvp[1,:])
+    if xfp:
+        set(h.xfp, 'xdata', xfp[0,:], 'ydata', xfp[1,:])
+    if plines:
+        set(h.obs, 'xdata', plines(1,:), 'ydata', plines(2,:))
+    pcov = make_covariance_ellipses(particles(ii(1)));
+    if pcov:
+        set(h.cov, 'xdata', pcov(1,:), 'ydata', pcov(2,:))
+    set(h.epath, 'xdata', epath(1,:), 'ydata', epath(2,:))
+    drawnow
 
 def main():
     # Initialization
@@ -160,8 +184,7 @@ def main():
 
             if z:
                 # TODO: Plot laser lines
-                #if z:
-                    #plines = make_laser_lines(z, particles[1].xv) # use the first particle for drawing the laser line
+                plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
 
                 # Data associations
                 for particle in particles:
