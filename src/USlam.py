@@ -127,42 +127,29 @@ def get_epath(particles, epath, NPARTICLES):
     w = [particle.w for particle in particles]
     ws = np.sum(w)
     w = w / ws # normalize
-
     # weighted mean vehicle pose
     xvmean = 0
     for i in range(NPARTICLES):
-        xvmean = xvmean + w[i] * xvp[i]
-
+        contribution = np.squeeze(xvp[i]) # TODO: Check why in a certain step we have particle[0] xvp as 3x1 and the rest 1x3
+        xvmean = xvmean + w[i] * contribution
     # keep the pose for recovering estimation trajectory
-    return [epath, xvmean]
-
+    return xvmean
+"""
 def init_animation():
     # Initialize animation
+    x = []
+    y = []
 
+def animate(epath):
+    y.append(epath[1][1])  # update the data.
+    x.append(epath[1][0])  # update the data.
 
 def do_plot(particles, plines, epath):
-    xvp = [particle.xv for particle in particles]
     xfp = [particle.xf for particle in particles]
     w = [particle.w for particle in particles]
     ii = np.where(w == max(w))[0]
     # TODO: Add animations
-    fig = plt.figure()
-    fig.add_axes([-150, 250, -100, 250])
-    fig.xlabel('[m]')
-    fig.ylabel('[m]')
-    ani = animation.FuncAnimation(fig, animate, init_func=init_animation, interval=2, blit=True, save_count=50)
-
-    if xvp:
-        set(h.xvp, 'xdata', xvp[0,:], 'ydata', xvp[1,:])
-    if xfp:
-        set(h.xfp, 'xdata', xfp[0,:], 'ydata', xfp[1,:])
-    if plines:
-        set(h.obs, 'xdata', plines(1,:), 'ydata', plines(2,:))
-    pcov = make_covariance_ellipses(particles(ii(1)));
-    if pcov:
-        set(h.cov, 'xdata', pcov(1,:), 'ydata', pcov(2,:))
-    set(h.epath, 'xdata', epath(1,:), 'ydata', epath(2,:))
-    drawnow
+"""
 
 def main():
     # Initialization
@@ -170,8 +157,15 @@ def main():
     sensor = Sensor()
     particles = init_particles(C.NPARTICLES)
     epath = []
-    plines = zeros((2, 1))
+    xdata = []
+    ydata = []
+    plt.show()
+    axes = plt.gca()
+    axes.set_xlim(-150, 250)
+    axes.set_ylim(-100, 250)
+    line, = axes.plot(xdata, ydata, 'r-')
     for i, t in enumerate(C.T):
+
         ctrlData = ctrl.read(t)
 
         if (ctrlData.speed != 0):
@@ -184,7 +178,8 @@ def main():
 
             if z:
                 # TODO: Plot laser lines
-                plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
+                plines = []
+                #plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
 
                 # Data associations
                 for particle in particles:
@@ -206,9 +201,14 @@ def main():
                     if particle.zn.size:
                         particle.augment_map()
 
-            #epath = get_epath(particles, epath, C.NPARTICLES)
-            #do_plot(particles, plines, epath);
-
+            epath = get_epath(particles, epath, C.NPARTICLES)
+            xdata.append(epath[0])
+            ydata.append(epath[1])
+            line.set_xdata(xdata)
+            line.set_ydata(ydata)
+            plt.draw()
+            plt.pause(1e-17)
+    plt.show()
 
 if __name__ == "__main__":
     main()
