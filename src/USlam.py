@@ -5,6 +5,13 @@ from Vehicle import *
 from FrontEnd import *
 import Constants as C
 from Utils import pi_to_pi
+from Plot import ProcessPlotter
+import multiprocessing as mp
+import time
+
+import matplotlib.pyplot as plt
+
+
 
 from math import sin, cos, nan
 
@@ -121,19 +128,6 @@ def line_plot_conversion(lne):
     p[:, 2::3] = nan
     return p
 
-def get_epath(particles, epath, NPARTICLES):
-    # vehicle state estimation result
-    xvp = [particle.xv for particle in particles]
-    w = [particle.w for particle in particles]
-    ws = np.sum(w)
-    w = w / ws # normalize
-    # weighted mean vehicle pose
-    xvmean = 0
-    for i in range(NPARTICLES):
-        contribution = np.squeeze(xvp[i]) # TODO: Check why in a certain step we have particle[0] xvp as 3x1 and the rest 1x3
-        xvmean = xvmean + w[i] * contribution
-    # keep the pose for recovering estimation trajectory
-    return xvmean
 """
 def init_animation():
     # Initialize animation
@@ -156,14 +150,11 @@ def main():
     ctrl = ControlPublisher()
     sensor = Sensor()
     particles = init_particles(C.NPARTICLES)
-    epath = []
-    xdata = []
-    ydata = []
-    plt.show()
-    axes = plt.gca()
-    axes.set_xlim(-150, 250)
-    axes.set_ylim(-100, 250)
-    line, = axes.plot(xdata, ydata, 'r-')
+    plot_pipe, plotter_pipe = mp.Pipe()
+    plotter = ProcessPlotter()
+    plot_process = mp.Process(
+        target=plotter, args=(plotter_pipe,), daemon=True)
+    plot_process.start()
     for i, t in enumerate(C.T):
 
         ctrlData = ctrl.read(t)
@@ -195,20 +186,13 @@ def main():
                         particle.feature_updateu()
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
-
+                plot_pipe.send((particles))
                 # When new feautres are observed, augment it ot the map
                 for particle in particles:
                     if particle.zn.size:
                         particle.augment_map()
 
-            epath = get_epath(particles, epath, C.NPARTICLES)
-            xdata.append(epath[0])
-            ydata.append(epath[1])
-            line.set_xdata(xdata)
-            line.set_ydata(ydata)
-            plt.draw()
-            plt.pause(1e-17)
-    plt.show()
+    #plt.show()
 
 if __name__ == "__main__":
     main()
