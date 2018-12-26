@@ -11,20 +11,15 @@ from matplotlib import collections  as mc
 
 
 PATH        = "../victoria_park/"
-GPS         = "GPS.txt"
-GPS_X       = "gps_x.txt"
-GPS_Y       = "gps_y.txt"
-MYGPS       = "mygps.txt"
+GPS         = "mygps.txt"
 
 alfa = -19.0/28.0
-rot = [[cos(alfa), -sin(alfa)],
-       [sin(alfa), cos(alfa)]]
 c = cos(alfa)
 s = sin(alfa)
-x = [-67.649271,-41.714218]
-x0 = [x[0]*c-x[1]*s, x[0]*s+x[1]*c]
+
 class ProcessPlotter (object):
     def __init__(self):
+        self.errcount = 0
         self.epath = []
         self.xdata = []
         self.ydata = []
@@ -34,13 +29,24 @@ class ProcessPlotter (object):
         self.gttime, self.gtx, self.gty = self.init_ground_truth()
         self.line_col = None
 
+        #Initialize figures
+        self.fig1, self.ax1 = plt.subplots()
+        axes = plt.gca()
+        axes.set_xlim(-150, 250)
+        axes.set_ylim(-100, 250)
+
+        self.fig2, self.ax2 = plt.subplots()
+
+        self.line, = self.ax1.plot([], [], 'r-')
+        self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
+
 
     def init_ground_truth(self):
-        f = open(PATH+MYGPS)
+        f = open(PATH+GPS)
         data = [[float(num) for num in line.split(',') if len(num) > 0] for line in f]
         f.close()
         t, x, y = [],[],[]
-        toff, xoff, yoff = data[0][0], data[0][1], data[0][2]
+        xoff, yoff =  data[0][1], data[0][2]
         for d in data:
             t.append(d[0])
             x.append(d[1]-xoff)
@@ -72,19 +78,11 @@ class ProcessPlotter (object):
         print('starting plotter...')
 
         self.pipe = pipe
-        self.fig, self.ax = plt.subplots()
-        axes = plt.gca()
-
-        axes.set_xlim(-150, 250)
-        axes.set_ylim(-100, 250)
-        self.line, = axes.plot(self.xdata, self.ydata, 'r-')
-        self.gt, = axes.plot(self.xgt, self.ygt, 'g-')
-        timer = self.fig.canvas.new_timer(interval=5)
+        timer = self.fig1.canvas.new_timer(interval=5)
         timer.add_callback(self.call_back)
         timer.start()
 
         print('...done')
-        self.line, = plt.gca().plot([], [], 'r-')
         plt.show()
 
     def __plot_epath(self, particles):
@@ -138,7 +136,7 @@ class ProcessPlotter (object):
             if xf.size:
                 x.append(xf[0])
                 y.append(xf[1])
-        plt.scatter(x, y, s=1, color='black')
+        self.ax1.scatter(x, y, s=1, color='black')
 
 
     def __plot_ground_truth(self, time):
@@ -146,20 +144,34 @@ class ProcessPlotter (object):
         Plots the ground truth up to a certain time instant.
         :param time: current time instant.
         """
+        i =0
         while(self.gttime[0]<time):
             self.xgt.append(self.gtx[0]*c-self.gty[0]*s)
             self.ygt.append(self.gtx[0]*s+self.gty[0]*c)
             self.gtx.pop(0)
             self.gty.pop(0)
             self.gttime.pop(0)
-        plt.scatter(self.xgt, self.ygt, s=1, color='blue')
+            i = i+1
+        self.ax1.scatter(self.xgt, self.ygt, s=1, color='blue')
+        if(i): # horrible.
+            self.__plot_error([self.xgt[-1], self.ygt[-1]])
+
+
+    def __plot_error(self, xv_gps):
+        xv_hat = np.array(self.epath)[0:2]
+        xv_gps = np.array(xv_gps)
+
+        d = xv_hat-xv_gps
+        e = (d[0]*d[0]+d[1]*d[1])**0.5
+        self.ax2.scatter(self.errcount, e, color = 'blue')
+        self.errcount = self.errcount+1
 
     def __plot_laser(self, z, xv):
         lines = self.make_laser_lines(z, xv)
         if self.line_col != None : #remove previous laser lines
             self.line_col.remove()
         lc = mc.LineCollection(lines, colors = np.array((0, 1, 0, 1)), linewidths=2)
-        self.ax.add_collection(lc)
+        self.ax1.add_collection(lc)
         self.line_col = lc
 
     def make_laser_lines(self, rb, xv):
@@ -204,9 +216,6 @@ class ProcessPlotter (object):
         p[0] = p[0] + b[0]
         p[1] = p[1] + b[1]
 
-        # if p is a pose and not a point
-        if len(p) == 3:
-            p[2] = pi_to_pi(p[2] + b[2])
         return p
 
 
