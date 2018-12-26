@@ -6,6 +6,7 @@ from FrontEnd import *
 import Constants as C
 from Utils import pi_to_pi
 from Plot import ProcessPlotter
+from Message import Message
 import multiprocessing as mp
 import time
 
@@ -155,6 +156,7 @@ def main():
     plot_process = mp.Process(
         target=plotter, args=(plotter_pipe,), daemon=True)
     plot_process.start()
+    message = None
     for i, t in enumerate(C.T):
 
         ctrlData = ctrl.read(t)
@@ -186,7 +188,7 @@ def main():
                         particle.feature_updateu()
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
-                plot_pipe.send((particles))
+                plot_pipe.send(Message(particles, t))
                 # When new feautres are observed, augment it ot the map
                 for particle in particles:
                     if particle.zn.size:
