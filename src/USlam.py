@@ -81,49 +81,6 @@ def stratified_random(N):
     s = di + np.random.rand(N) * k - k / 2  # dither within interval
     return s
 
-def make_laser_lines(rb, xv):
-    if not rb:
-        p = []
-        return
-    len_ = len(rb)
-    lnes_x = np.zeros((1, len_)) + xv[0]
-    lnes_y = np.zeros((1, len_)) + xv[1]
-    lnes_distance = np.zeros((1, len_))
-    lnes_angle = np.zeros((1, len_))
-    # TODO: Check rb structure
-    for i in range(len(rb)):
-        lnes_distance[0][i] = rb[i].distance
-        lnes_angle[0][i] = rb[i].angle
-
-        # lnes = np.append([lnes_x, lnes_y, lnes_angle], axis = 0)
-    lnes_end_pos = TransformToGlobal([np.multiply(lnes_distance[0], np.cos(lnes_angle[0])),
-                                   np.multiply(lnes_distance[0], np.sin(lnes_angle[0]))], xv)
-    #p = line_plot_conversion([lnes_x, lnes_y, lnes_end_pos])
-    data = []
-    for i in range(len(rb)):
-        data.append([(lnes_x[0][i], lnes_y[0][i]),(lnes_end_pos[0][i], lnes_end_pos[1][i])])
-        #data.append((lnes_end_pos[0][i], lnes_end_pos[1][i]))
-    return data
-
-def TransformToGlobal(p, b):
-    # Transform a list of poses [x;y;phi] so that they are global wrt a base pose
-    # rotate
-    rot = zeros((2, 2))
-    rot[0,0] = cos(b[2])
-    rot[0,1] = -sin(b[2])
-    rot[1,0] = sin(b[2])
-    rot[1,1] = cos(b[2])
-    p[0:2] = np.dot(rot, p[0:2])
-
-    # translate
-    p[0] = p[0] + b[0]
-    p[1] = p[1] + b[1]
-
-    # if p is a pose and not a point
-    if len(p) == 3:
-       p[2] = pi_to_pi(p[2] + b[2])
-    return p
-
 
 """
 def init_animation():
@@ -167,8 +124,8 @@ def main():
 
             if z:
                 # TODO: Plot laser lines
-                plines = []
-                plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
+                #plines = []
+                #plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
 
                 # Data associations
                 for particle in particles:
@@ -184,12 +141,13 @@ def main():
                         particle.feature_updateu()
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
-                plot_pipe.send(Message(particles, t, plines))
+                plot_pipe.send(Message(particles, z, t))
 
                 # When new feautres are observed, augment it ot the map
                 for particle in particles:
                     if particle.zn.size:
                         particle.augment_map()
+
 
     #plt.show()
 

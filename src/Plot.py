@@ -28,10 +28,11 @@ class ProcessPlotter (object):
         self.epath = []
         self.xdata = []
         self.ydata = []
+        self.theta = []
         self.xgt = [] #x of ground truth
         self.ygt = [] #y of ground truth
         self.gttime, self.gtx, self.gty = self.init_ground_truth()
-        self.line_col = []
+        self.line_col = None
 
 
     def init_ground_truth(self):
@@ -62,8 +63,8 @@ class ProcessPlotter (object):
 
                 self.__plot_epath(msg.particles)
                 self.__plot_ground_truth(msg.time)
-                #self.__plot_features(msg.particles)
-                self.__plot_laser(msg.laser)
+                self.__plot_features(msg.particles)
+                self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
             plt.draw()
         return True
 
@@ -78,7 +79,7 @@ class ProcessPlotter (object):
         axes.set_ylim(-100, 250)
         self.line, = axes.plot(self.xdata, self.ydata, 'r-')
         self.gt, = axes.plot(self.xgt, self.ygt, 'g-')
-        timer = self.fig.canvas.new_timer(interval=20)
+        timer = self.fig.canvas.new_timer(interval=5)
         timer.add_callback(self.call_back)
         timer.start()
 
@@ -95,6 +96,7 @@ class ProcessPlotter (object):
         self.epath = self.__get_epath(self.epath, particles, C.NPARTICLES)
         self.xdata.append(self.epath[0])
         self.ydata.append(self.epath[1])
+        self.theta.append(self.epath[2])
         self.line.set_xdata(self.xdata)
         self.line.set_ydata(self.ydata)
         #plt.pause(1e-15)
@@ -128,12 +130,16 @@ class ProcessPlotter (object):
         """
         x = []
         y = []
-        for particle in particles:
-            for xf in particle.xf.T:
-                if xf.size:
-                    x.append(xf[0])
-                    y.append(xf[1])
-        plt.scatter(x, y, s=1, color='blue')
+        ws = [particle.w for particle in particles]
+        maxInd = ws.index(max(ws))
+        maxP = particles[maxInd]
+        #for particle in particles:
+        for xf in maxP.xf.T:
+            if xf.size:
+                x.append(xf[0])
+                y.append(xf[1])
+        plt.scatter(x, y, s=1, color='black')
+
 
     def __plot_ground_truth(self, time):
         """
@@ -148,12 +154,61 @@ class ProcessPlotter (object):
             self.gttime.pop(0)
         plt.scatter(self.xgt, self.ygt, s=1, color='blue')
 
-    def __plot_laser(self, lines):
-        # TODO: Remove the laser lines from the previous period
-        # self.line_col.remove()
+    def __plot_laser(self, z, xv):
+        lines = self.make_laser_lines(z, xv)
+        if self.line_col != None : #remove previous laser lines
+            self.line_col.remove()
         lc = mc.LineCollection(lines, colors = np.array((0, 1, 0, 1)), linewidths=2)
         self.ax.add_collection(lc)
         self.line_col = lc
+
+    def make_laser_lines(self, rb, xv):
+        """
+        Creates the laser lines from the estimated position of the car to the detected obstacles.
+        :param rb:
+        :param xv: vehicle position
+        :return: list of laser lines
+        """
+        if not rb:
+            p = []
+            return
+        len_ = len(rb)
+        lnes_x = np.zeros((1, len_)) + xv[0]
+        lnes_y = np.zeros((1, len_)) + xv[1]
+        lnes_distance = np.zeros((1, len_))
+        lnes_angle = np.zeros((1, len_))
+        # TODO: Check rb structure
+        for i in range(len(rb)):
+            lnes_distance[0][i] = rb[i].distance
+            lnes_angle[0][i] = rb[i].angle
+
+            # lnes = np.append([lnes_x, lnes_y, lnes_angle], axis = 0)
+        lnes_end_pos = self.TransformToGlobal([np.multiply(lnes_distance[0], np.cos(lnes_angle[0])),
+                                          np.multiply(lnes_distance[0], np.sin(lnes_angle[0]))], xv)
+        # p = line_plot_conversion([lnes_x, lnes_y, lnes_end_pos])
+        data = []
+        for i in range(len(rb)):
+            data.append([(lnes_x[0][i], lnes_y[0][i]), (lnes_end_pos[0][i], lnes_end_pos[1][i])])
+            # data.append((lnes_end_pos[0][i], lnes_end_pos[1][i]))
+        return data
+
+    def TransformToGlobal(self, p, b):
+        # Transform a list of poses [x;y;phi] so that they are global wrt a base pose
+        # rotate
+        phi = b[2]
+        rot = np.array([[cos(phi), -sin(phi)],
+               [sin(phi), cos(phi)]])
+        p[0:2] = np.dot(rot, p[0:2])
+
+        # translate
+        p[0] = p[0] + b[0]
+        p[1] = p[1] + b[1]
+
+        # if p is a pose and not a point
+        if len(p) == 3:
+            p[2] = pi_to_pi(p[2] + b[2])
+        return p
+
 
 
 
