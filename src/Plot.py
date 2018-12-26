@@ -1,10 +1,14 @@
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+if plt.get_backend()=="MacOSX":
+    mp.set_start_method("forkserver")
 import Constants as C
 import numpy as np
 import Message
 from math import sin, cos
+from matplotlib import collections  as mc
+
 
 PATH        = "../victoria_park/"
 GPS         = "GPS.txt"
@@ -27,14 +31,10 @@ class ProcessPlotter (object):
         self.xgt = [] #x of ground truth
         self.ygt = [] #y of ground truth
         self.gttime, self.gtx, self.gty = self.init_ground_truth()
+        self.line_col = []
+
 
     def init_ground_truth(self):
-        """f = open(PATH+GPS_X)
-        gtx = [float(line.lstrip()) for line in f]
-        f.close()
-        f = open(PATH+GPS_Y)
-        gty = [float(line.lstrip()) for line in f]
-        f.close()"""
         f = open(PATH+MYGPS)
         data = [[float(num) for num in line.split(',') if len(num) > 0] for line in f]
         f.close()
@@ -59,9 +59,11 @@ class ProcessPlotter (object):
             if msg is None:
                 break
             else:
+
                 self.__plot_epath(msg.particles)
                 self.__plot_ground_truth(msg.time)
                 #self.__plot_features(msg.particles)
+                self.__plot_laser(msg.laser)
             plt.draw()
         return True
 
@@ -127,7 +129,6 @@ class ProcessPlotter (object):
         x = []
         y = []
         for particle in particles:
-
             for xf in particle.xf.T:
                 if xf.size:
                     x.append(xf[0])
@@ -146,5 +147,14 @@ class ProcessPlotter (object):
             self.gty.pop(0)
             self.gttime.pop(0)
         plt.scatter(self.xgt, self.ygt, s=1, color='blue')
+
+    def __plot_laser(self, lines):
+        # TODO: Remove the laser lines from the previous period
+        # self.line_col.remove()
+        lc = mc.LineCollection(lines, colors = np.array((0, 1, 0, 1)), linewidths=2)
+        self.ax.add_collection(lc)
+        self.line_col = lc
+
+
 
 
