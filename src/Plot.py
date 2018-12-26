@@ -5,17 +5,23 @@ matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 import Constants as C
 import numpy as np
+import multiprocessing as mp
+from matplotlib import collections  as mc
+
 
 class ProcessPlotter (object):
     def __init__(self):
         self.epath = []
         self.xdata = []
         self.ydata = []
+        self.line_col = []
         axes = plt.gca()
         axes.set_xlim(-150, 250)
         axes.set_ylim(-100, 250)
         self.line, = axes.plot(self.xdata, self.ydata, 'r-')
         print(plt.get_backend())
+        mp.set_start_method("forkserver")
+
         #plt.show()
 
 
@@ -24,7 +30,7 @@ class ProcessPlotter (object):
 
     def call_back(self):
         while self.pipe.poll():
-            data = self.pipe.recv()
+            data, laser = self.pipe.recv()
             if data is None:
                 break
                 #self.terminate()
@@ -32,6 +38,7 @@ class ProcessPlotter (object):
             else:
                 self.__plot_epath(data)
                 self.__plot_features(data)
+                self.__plot_laser(laser)
             plt.draw()
         return True
 
@@ -78,7 +85,6 @@ class ProcessPlotter (object):
         x = []
         y = []
         for particle in particles:
-
             for xf in particle.xf.T:
                 if xf.size:
                     x.append(xf[0])
@@ -86,5 +92,14 @@ class ProcessPlotter (object):
         plt.scatter(x, y, s=1, color='blue')
         #plt.draw()
         #plt.pause(1e-15)
+
+    def __plot_laser(self, lines):
+        # TODO: Remove the laser lines from the previous period
+        # self.line_col.remove()
+        lc = mc.LineCollection(lines, colors = np.array((0, 1, 0, 1)), linewidths=2)
+        self.ax.add_collection(lc)
+        self.line_col = lc
+
+
 
 

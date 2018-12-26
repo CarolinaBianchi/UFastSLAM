@@ -87,10 +87,22 @@ def make_laser_lines(rb, xv):
     len_ = len(rb)
     lnes_x = np.zeros((1, len_)) + xv[0]
     lnes_y = np.zeros((1, len_)) + xv[1]
+    lnes_distance = np.zeros((1, len_))
+    lnes_angle = np.zeros((1, len_))
     # TODO: Check rb structure
-    lnes_angle = TransformToGlobal([rb[0]*np.array(cos(rb[1,:])), rb[0,:]*np.array(sin(rb[1,:]))], xv)
-    lnes = np.append([lnes_x, lnes_y, lnes_angle], axis = 0)
-    p = line_plot_conversion(lnes)
+    for i in range(len(rb)):
+        lnes_distance[0][i] = rb[i].distance
+        lnes_angle[0][i] = rb[i].angle
+
+        # lnes = np.append([lnes_x, lnes_y, lnes_angle], axis = 0)
+    lnes_end_pos = TransformToGlobal([np.multiply(lnes_distance[0], np.cos(lnes_angle[0])),
+                                   np.multiply(lnes_distance[0], np.sin(lnes_angle[0]))], xv)
+    #p = line_plot_conversion([lnes_x, lnes_y, lnes_end_pos])
+    data = []
+    for i in range(len(rb)):
+        data.append([(lnes_x[0][i], lnes_y[0][i]),(lnes_end_pos[0][i], lnes_end_pos[1][i])])
+        #data.append((lnes_end_pos[0][i], lnes_end_pos[1][i]))
+    return data
 
 def TransformToGlobal(p, b):
     # Transform a list of poses [x;y;phi] so that they are global wrt a base pose
@@ -100,33 +112,17 @@ def TransformToGlobal(p, b):
     rot[0,1] = -sin(b[2])
     rot[1,0] = sin(b[2])
     rot[1,1] = cos(b[2])
-    p[0:2,:] = rot*p[0:2,:]
+    p[0:2] = np.dot(rot, p[0:2])
 
     # translate
-    p[0,:] = p[0,:] + b[0]
-    p[1,:] = p[1,:] + b[1]
+    p[0] = p[0] + b[0]
+    p[1] = p[1] + b[1]
 
     # if p is a pose and not a point
-    if p.shape[0] == 3:
-       p[2,:] = pi_to_pi(p[2,:] + b[2])
+    if len(p) == 3:
+       p[2] = pi_to_pi(p[2] + b[2])
     return p
 
-def line_plot_conversion(lne):
-    """
-    INPUT: list of lines[x1; y1; x2; y2]
-    OUTPUT: list of points[x; y]
-    ----------------------------------
-    Convert a list of lines so that they will be plotted as a set of unconnected lines but only require a single handle
-    to do so. This is performed by converting the lines to a set of points, where a NaN point is inserted between
-    every point-pair
-    """
-    len = lne.shape[1] * 3 - 1
-    p = zeros((2, len))
-
-    p[:, ::3] = lne[0: 2,:]
-    p[:,1::3] = lne[2: 4,:]
-    p[:, 2::3] = nan
-    return p
 
 """
 def init_animation():
@@ -153,7 +149,7 @@ def main():
     plot_pipe, plotter_pipe = mp.Pipe()
     plotter = ProcessPlotter()
     plot_process = mp.Process(
-        target=plotter, args=(plotter_pipe,), daemon=True)
+       target=plotter, args=(plotter_pipe,), daemon=True)
     plot_process.start()
     for i, t in enumerate(C.T):
 
@@ -170,7 +166,7 @@ def main():
             if z:
                 # TODO: Plot laser lines
                 plines = []
-                #plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
+                plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
 
                 # Data associations
                 for particle in particles:
@@ -186,7 +182,7 @@ def main():
                         particle.feature_updateu()
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
-                plot_pipe.send((particles))
+                plot_pipe.send((particles, plines))
                 # When new feautres are observed, augment it ot the map
                 for particle in particles:
                     if particle.zn.size:
