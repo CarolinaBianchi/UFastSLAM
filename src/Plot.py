@@ -6,14 +6,14 @@ if plt.get_backend()=="MacOSX":
 import Constants as C
 import numpy as np
 import Message
-from math import sin, cos
+from math import sin, cos, atan
 from matplotlib import collections  as mc
 
 
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
-alfa = -19.0/28.0
+alfa = atan(-20/28)
 c = cos(alfa)
 s = sin(alfa)
 
