@@ -40,6 +40,7 @@ class ProcessPlotter (object):
 
         self.line, = self.ax1.plot([], [], 'r-')
         self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
+        self.oldFeatures = self.ax1.scatter([],[])
 
 
     def init_ground_truth(self):
@@ -68,10 +69,10 @@ class ProcessPlotter (object):
                 break
             else:
                 self.__plot_epath(msg.particles)
-                self.__plot_ground_truth(msg.time)
+                #self.__plot_ground_truth(msg.time)
                 self.__plot_features(msg.particles)
                 self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
-                #self.__plot_covariance_ellipse(msg.particles)
+                self.__plot_covariance_ellipse(msg.particles)
             plt.draw()
         return True
 
@@ -127,17 +128,18 @@ class ProcessPlotter (object):
         :param particles:
         :return:
         """
+        self.oldFeatures.remove()
         x = []
         y = []
         ws = [particle.w for particle in particles]
         maxInd = ws.index(max(ws))
         maxP = particles[maxInd]
-        #for particle in particles:
+
         for xf in maxP.xf.T:
             if xf.size:
                 x.append(xf[0])
                 y.append(xf[1])
-        self.ax1.scatter(x, y, s=1, color='black')
+        self.oldFeatures = self.ax1.scatter(x, y, s=1, color='black')
 
 
     def __plot_ground_truth(self, time):
@@ -218,12 +220,19 @@ class ProcessPlotter (object):
             print(cov)
             cov.remove() # FAIL: Check how to remove previous covariance plots
         """
-        for particle in particles:
-            cov_veh_plot = self.obtain_squared_P(particle.Pv[:2,:2], circ, particle.xv[:2]) # plot the covariance of the vehicle position
-            self.covariances.append(cov_veh_plot) # to remove it when redrawing
-            for i in range(np.size(particle.xf, 1)):  # number of known features
-                cov_feat_plot = self.obtain_squared_P(particle.Pf[:2, :2, i], circ, particle.xf[:2,i]) # plot the covariance of the features
-                self.covariances.append(cov_feat_plot)  # to remove it when redrawing
+        #Take only particle with maximum weight - as what was done with the features
+        ws = [particle.w for particle in particles]
+        maxInd = ws.index(max(ws))
+        particle = particles[maxInd]
+
+        for c in self.covariances:
+            c.remove()
+        self.covariances = []
+        cov_veh_plot = self.obtain_squared_P(particle.Pv[:2,:2], circ, particle.xv[:2]) # plot the covariance of the vehicle position
+        self.covariances.append(cov_veh_plot) # to remove it when redrawing
+        for i in range(np.size(particle.xf, 1)):  # number of known features
+            cov_feat_plot = self.obtain_squared_P(particle.Pf[:2, :2, i], circ, particle.xf[:2,i]) # plot the covariance of the features
+            self.covariances.append(cov_feat_plot)  # to remove it when redrawing
 
     def obtain_squared_P(self, P, circ, pos):
         """
