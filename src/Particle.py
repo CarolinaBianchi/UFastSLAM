@@ -392,8 +392,8 @@ class Particle:
             v[1] = pi_to_pi(v[1])
             # Kalman gain
             Kt = Sigma.dot(linalg.inv(St))
-            self.xf[:,self.idf[i]] = self.xf[:,self.idf[i]] + Kt.dot(v) # equation 20
-            self.Pf[:,:,self.idf[i]] = self.Pf[:,:,self.idf[i]] - (Kt.dot(St)).dot(Kt.T) # equation 21
+            self.xf[:,self.idf[i]] = xf[:,i] + Kt.dot(v) # equation 20
+            self.Pf[:,:,self.idf[i]] = Pf[:,:,i] - (Kt.dot(St)).dot(Kt.T) # equation 21
 
 
     def augment_map(self):
