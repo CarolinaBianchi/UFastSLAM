@@ -1,13 +1,13 @@
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-if plt.get_backend()=="MacOSX":
-    mp.set_start_method("forkserver")
 import Constants as C
 import numpy as np
+from numpy import linalg
 import Message
-from math import sin, cos, atan
+from math import sin, cos, atan, pi
 from matplotlib import collections  as mc
+from scipy.linalg import schur
 
 
 PATH        = "../victoria_park/"
@@ -26,6 +26,7 @@ class ProcessPlotter (object):
         self.theta = []
         self.xgt = [] #x of ground truth
         self.ygt = [] #y of ground truth
+        self.covariances = []
         self.gttime, self.gtx, self.gty = self.init_ground_truth()
         self.line_col = None
 
@@ -66,11 +67,11 @@ class ProcessPlotter (object):
             if msg is None:
                 break
             else:
-
                 self.__plot_epath(msg.particles)
                 self.__plot_ground_truth(msg.time)
-                #self.__plot_features(msg.particles)
-                #self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
+                self.__plot_features(msg.particles)
+                self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
+                #self.__plot_covariance_ellipse(msg.particles)
             plt.draw()
         return True
 
@@ -203,6 +204,48 @@ class ProcessPlotter (object):
             data.append([(lnes_x[0][i], lnes_y[0][i]), (lnes_end_pos[0][i], lnes_end_pos[1][i])])
             # data.append((lnes_end_pos[0][i], lnes_end_pos[1][i]))
         return data
+
+    def __plot_covariance_ellipse(self, particles):
+         N = 10 # number of points ellipse
+         phi = np.array(np.linspace(0, 2 * pi, N, endpoint=True))
+         circ = 2 * np.array([np.cos(phi), np.sin(phi)])
+         self.make_ellipse(particles, circ)
+
+    def make_ellipse(self, particles, circ): # if integ 0 plot cov of vehicle, if 1 landmark covariance
+        # TODO: Remove previous covariances
+        """
+        for cov in self.covariances:
+            print(cov)
+            cov.remove() # FAIL: Check how to remove previous covariance plots
+        """
+        for particle in particles:
+            cov_veh_plot = self.obtain_squared_P(particle.Pv[:2,:2], circ, particle.xv[:2]) # plot the covariance of the vehicle position
+            self.covariances.append(cov_veh_plot) # to remove it when redrawing
+            for i in range(np.size(particle.xf, 1)):  # number of known features
+                cov_feat_plot = self.obtain_squared_P(particle.Pf[:2, :2, i], circ, particle.xf[:2,i]) # plot the covariance of the features
+                self.covariances.append(cov_feat_plot)  # to remove it when redrawing
+
+    def obtain_squared_P(self, P, circ, pos):
+        """
+        :param P:
+        :param circ:
+        :param pos:
+        :return:
+        Obtain the radius of the covariance after squaring the matrix and plotting it. Both position vehicle and
+        position feature covariances are plotted
+        """
+        R = np.zeros((2, 2))
+        [T, Q] = schur(P)
+        R[0, 0] = np.sqrt(T[0, 0])
+        R[1, 1] = np.sqrt(T[1, 1])
+        R[0, 1] = T[0, 1] / (R[0, 0] + R[1, 1])
+        r = linalg.multi_dot([Q, R, Q.T])
+        a = np.dot(r, circ)
+        position = np.squeeze(pos) # TODO: Check why sometimes xv has dimension (2,1) and sometimes (2,)
+        position = position.reshape((2, 1))
+        p = a + np.matlib.repmat(position, 1, a.shape[1])
+        p1 = self.ax1.scatter(p[0], p[1], s=1, color='yellow') # TODO: Check if you can provide array vectors instead of integers
+        return p1
 
     def TransformToGlobal(self, p, b):
         # Transform a list of poses [x;y;phi] so that they are global wrt a base pose
