@@ -13,7 +13,7 @@ from matplotlib import collections  as mc
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
-alfa = atan(-20/28)
+alfa = atan(-22/28)
 c = cos(alfa)
 s = sin(alfa)
 
@@ -69,8 +69,8 @@ class ProcessPlotter (object):
 
                 self.__plot_epath(msg.particles)
                 self.__plot_ground_truth(msg.time)
-                self.__plot_features(msg.particles)
-                self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
+                #self.__plot_features(msg.particles)
+                #self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
             plt.draw()
         return True
 
@@ -78,7 +78,7 @@ class ProcessPlotter (object):
         print('starting plotter...')
 
         self.pipe = pipe
-        timer = self.fig1.canvas.new_timer(interval=5)
+        timer = self.fig1.canvas.new_timer(interval=10)
         timer.add_callback(self.call_back)
         timer.start()
 

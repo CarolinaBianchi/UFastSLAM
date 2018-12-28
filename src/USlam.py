@@ -51,11 +51,35 @@ def resample_particles(particles, Nmin):
 
     [keep, Neff] = stratified_resample(waux)
     if Neff <= Nmin:
-        for i in range(N):
-            particles[i] = particles[keep[i]].deepcopy()
-            particles[i].w = 1 / N
+        unique, toCopy = get_unique(keep)
+        n_particles = [particles[i] for i in unique]
+        for i, v in enumerate(toCopy):
+            n_particles.append(particles[v].deepcopy())
+
+        for u in n_particles :
+            u.w = 1 / N
+        particles = n_particles
 
     return particles
+
+def get_unique(vals):
+    """
+    Separates vals into 2 different lists:
+    - 1 of the unique values contained in the list
+    - repeated values
+    The union of the two returned lists is the original one.
+    :param self:
+    :param array:
+    :return:
+    """
+    unique = []
+    repeated = []
+    for v in vals:
+        if v in unique :
+            repeated.append(v)
+        else :
+            unique.append(v)
+    return unique, repeated
 
 
 def stratified_resample(w):  # TODO: Check w is normalized
@@ -111,7 +135,6 @@ def main():
     plot_process.start()
     message = None
     for i, t in enumerate(C.T):
-
         ctrlData = ctrl.read(t)
 
         if (ctrlData.speed != 0):
@@ -122,11 +145,7 @@ def main():
             # Measurement
             z = FrontEnd.filter(sensor.read(t, C.T[i + 1]))
 
-            if z:
-                # TODO: Plot laser lines
-                #plines = []
-                #plines = make_laser_lines(z, particles[0].xv) # use the first particle for drawing the laser line
-
+            if size(z):
                 # Data associations
                 for particle in particles:
                     particle.data_associateNN(z)
@@ -135,7 +154,7 @@ def main():
                 for particle in particles:
                     # Sample from optimal proposal distribution
                     if particle.zf.size:
-                        particle.sample_proposaluf()
+                        particle.sample_proposaluf()    #Updates state estimation taking into account the measurements (FastSLAM 2.0)
 
                         # Map update
                         particle.feature_updateu()

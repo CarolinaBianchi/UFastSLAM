@@ -36,7 +36,7 @@ NEFFECTIVE= 0.5*NPARTICLES # minimum number of effective particles
 
 # Data association - innovation gates (Mahalanobis distance)
 GATE_REJECT= 5.991     # maximum distance for association
-GATE_AUGMENT_NN= 2000  # minimum distance for creation of new feature
+GATE_AUGMENT_NN= 200  # minimum distance for creation of new feature
 GATE_AUGMENT= 100      # minimum distance for creation of new feature (100)
 
 # Parameters related to SUT
@@ -65,6 +65,7 @@ beta_r=2 # optimal for gaussian priors
 kappa_r=0
 lambda_r = alpha_r**2 * (n_r + kappa_r) - n_r
 lambda_r= lambda_r+dimR; # should consider dimension of related terms for obtaining equivalent effect with full augmentation
+# (EQ 7)
 wg_r = zeros((2*n_r+1)); wc_r = zeros((2*n_r+1))
 wg_r[0] = lambda_r/(n_r + lambda_r)                            #weights to compute the mean
 wc_r[0] = lambda_r / (n_r+lambda_r) + (1 - alpha_r**2 + beta_r) #weights to compute the covariance

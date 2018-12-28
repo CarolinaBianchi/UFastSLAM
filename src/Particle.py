@@ -57,29 +57,39 @@ class Particle:
         Modifies the particles predicted mean and covariance (xv, Pv), and sigma points (Kaiy).
         :param ctrl: object of type Control.
         """
+        L = self.nr                 # number of dimensions of the augmented state vector
+        dt = self.dt                # time between each control input
+
+        #Car parameters
+        a, b, Le, H = self.vehicle.a, self.vehicle.b, self.vehicle.L, self.vehicle.H
         V = ctrl.speed
         G = ctrl.steering
-        dimv = self.xv.shape[0] # pose vehicle dimension
-        dimQ = len(self.Qe) # measurement dimension; Qe [variance speed ,0 ; 0, variance steering]
-        # state augmentation: process noise only
-        x_aug = np.append(self.xv , zeros((dimQ, 1))) # to add control input and observation
+        dimv = self.xv.shape[0]     # pose vehicle dimension
+        dimQ = len(self.Qe)         # control dimension; Qe [variance speed ,0 ; 0, variance steering]
 
+        # State augmentation: process noise only
+        x_aug = np.append(self.xv , zeros((dimQ, 1))) # to add control input
+
+        # (EQ 2)
         P_aug = np.append(
             np.append(self.Pv, zeros((dimv, dimQ)), axis = 1),
             np.append(zeros((dimQ, dimv)), self.Qe, axis = 1),
             axis = 0
         )
-        # set sigma points
-        Z = (self.nr +self.lambda_r) * (P_aug) + EPS * eye(self.nr) # values inside the sqaure root
-        S = np.transpose(linalg.cholesky(Z))
-        Kaix = zeros((self.nr, 2 * self.nr + 1)) # to include both positive and negative position particles
-        Kaix[:,0] = x_aug  # the average step is one of the points chosen
-        for k in range(self.nr):
-            # we omit the average point as already added
-            Kaix[:, k + 1] = x_aug + S[:, k] # for k= 1:L
-            Kaix[:, k + 1 + self.nr] = x_aug - S[:, k] # for k= L+1:2L
 
-        Kaiy = zeros((dimv, 2 * self.nr + 1)) # array where the transformed sigma points saved with non augmented state
+        # Set sigma points
+        Z = (L +self.lambda_r) * (P_aug) + EPS * eye(L) # values inside the square root
+        S = linalg.cholesky(Z)
+        Kaix = zeros((L, 2 * L + 1))                    # to include both positive and negative position particles
+        Kaix[:,0] = x_aug                               # the average step is one of the points chosen
+
+        # (EQ 3)
+        for k in range(L):
+            # we omit the average point as already added
+            Kaix[:, k + 1] = x_aug + S[:, k]            # for k= 1:L
+            Kaix[:, k + 1 + L] = x_aug - S[:, k]  # for k= L+1:2L
+
+        Kaiy = zeros((dimv, 2 * L + 1))                       # process model evaluated in sigma points
         xv_p = np.zeros((1, 3)) # new average state vehicle
         Pv_p = np.zeros((3,3)) #[[0 for x in range(3)] for y in range(3)]
 
@@ -87,16 +97,21 @@ class Particle:
             Vn = V + sigma_point[3] # add process noise of linear speed if exists in Kaix
             Gn = G + sigma_point[4] # add process noise of steering if exist in Kaix
 
-            Vc = Vn / (1 - tan(Gn) * self.vehicle.H / self.vehicle.L) # tan of radians ; vehicle[1] --> H ; [0] --> L
+            Vc = Vn / (1 - tan(Gn) * H / Le)
 
-            Kaiy[0, index] = sigma_point[0] + self.dt * (Vc * cos(sigma_point[2]) - Vc / self.vehicle.L * tan(Gn) * (
-                        self.vehicle.a * sin(sigma_point[2]) + self.vehicle.b * cos(sigma_point[2])))
-            Kaiy[1, index] = sigma_point[1] + self.dt * (Vc * sin(sigma_point[2]) + Vc / self.vehicle.L * tan(Gn) * (
-                        self.vehicle.a * cos(sigma_point[2]) - self.vehicle.b * sin(sigma_point[2])))
-            Kaiy[2, index] = sigma_point[2] + Vc * self.dt * tan(Gn) / self.vehicle.L
-            xv_p = xv_p + self.wg[index] * Kaiy[:,index] # average calculated by giving certain weight each particle
+            # (EQ 4)
+            Kaiy[0, index] = sigma_point[0] + dt * (Vc * cos(sigma_point[2]) - Vc / Le * tan(Gn) * (
+                        a * sin(sigma_point[2]) + b * cos(sigma_point[2])))
+            Kaiy[1, index] = sigma_point[1] + dt * (Vc * sin(sigma_point[2]) + Vc / Le * tan(Gn) * (
+                        a * cos(sigma_point[2]) - b * sin(sigma_point[2])))
+            Kaiy[2, index] = sigma_point[2] + Vc * dt * tan(Gn) / Le
+
+            # (EQ 5)
+            xv_p = xv_p + self.wg[index] * Kaiy[:,index] # average calculated by giving certain weight each sigma point
 
         self.xv = xv_p.T
+
+        # (EQ 6)
         for index, sigma_point in enumerate(Kaix.T):
             d = Kaiy[:,index] - xv_p
             Pv_p = Pv_p + self.wc[index] * (d.T).dot(d)
@@ -106,13 +121,10 @@ class Particle:
 
     def data_associateNN(self, z):
         """
-        #TO DO
         Implements a simple gated nearest-neighbour data-association.
         Modifies the particle's zf, idf and zn.
         :param z: list of of ListSensorMeasurements. NB: Can be empty.
         """
-        if(size(z)==0):
-            return
         R = Particle.Re
         G_REJ = Particle.GATE_REJECT
         G_AUG = Particle.GATE_AUGMENT
@@ -130,7 +142,7 @@ class Particle:
                 jbest_s = -1
 
                 for j in range(Nf):  # For any known feature
-                    dx = self.xf[0,j]-xv[0] # distance_x between known feature and current car pose
+                    dx = self.xf[0,j]-xv[0]             # distance_x between known feature and current car pose
                     dy = self.xf[1,j]-xv[1]
                     d = sqrt(dx**2 + dy**2)             # Distance vehicle-feaure
                     ang = pi_to_pi(atan2(dy, dx)-xv[2])
@@ -160,12 +172,12 @@ class Particle:
         """
         Returns normalised innovation squared (Malahanobis distance)
         """
-        zp, _, _, Sf, Sv = self.__compute_jacobians(idf, R)
+        zp, Sf = self.__compute_jacobians(idf, R)
         z= np.array([z.distance, z.angle])
         v = z-zp                            # innovation
         v[1] = pi_to_pi(v[1])
         Sf =np.array(Sf, dtype='float')
-        return np.dot(np.dot(np.transpose(v), np.linalg.inv(Sf)), v)
+        return (v.T.dot(np.linalg.inv(Sf))).dot(v)
 
 
     def __compute_jacobians(self, idf, R):
@@ -174,75 +186,75 @@ class Particle:
         xf = self.xf[:, idf]
         Pf = self.Pf[:,:,idf]
 
-        #for i in range(len(idf)): #WHY WAS MATLAB CODE LIKE THAT??
+        #for i in range(len(idf)):
         dx = xf[0] - xv[0]
         dy = xf[1] - xv[1]
         d2 = dx**2 + dy**2
         d = sqrt(d2)
         zp = np.array([d,pi_to_pi(atan2(dy, dx)-xv[2])]) # predicted measure from car frame to the feature
 
-        Hv = np.array(  [[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
-                        [dy/d2, -dx/d2, -1]])
+        #Hv = np.array(  [[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
+        #                [dy/d2, -dx/d2, -1]])
         Hf = np.array([[dx/d, dy/d],                       # Jacobian wrt feature states
                         [-dy/d2, dx/d2]])
         Sf = np.dot(np.dot(np.squeeze(Hf), Pf), np.transpose(np.squeeze(Hf))) + R
-        Sv = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
-        return (zp, Hv, Hf, Sf, Sv)
+        #Sv = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
+        return (zp, Sf)
 
     def sample_proposaluf(self):
         """
-        #TO DO
         Compute proposal distribution and then sample from it.
         """
-        #if size(self.zf)==0:
-        #    return
         R = Particle.Re
         n = Particle.n_aug
-        #lmb = Particle.lambda_aug
         wg = Particle.wg_aug
         wc = Particle.wc_aug
-
-        lenidf = np.size(self.idf) # number of currently observed features
-        dimv = self.xv.shape[0] # vehicle state dimension
-        dimf = self.zf.shape[1] # feature state dimension
+        n_aug = self.n_aug
+        lenidf = np.size(self.idf)                          # number of currently observed features
+        dimv = self.xv.shape[0]                             # vehicle state dimension
+        dimf = self.zf.shape[1]                             # feature state dimension
         # TODO: Why self.zf provides info in row format and not in columns?
-        z_hat = zeros((dimf * lenidf, 1)) # predictive observation
-        z = zeros((dimf * lenidf, 1)) # sensory observation
-        A = zeros((dimf * lenidf, 2 * self.n_aug + 1)) # stack of innovation covariance for vehicle uncertainty
-        A_eval = zeros(np.shape(A))
+        n_hat = zeros((dimf * lenidf, 1))                   # predictive observation
+        z = zeros((dimf * lenidf, 1))                       # sensory observation
+        N = zeros((dimf * lenidf, 2 * self.n_aug + 1))      # stack of innovation covariance for vehicle uncertainty
+        N_eval = zeros(np.shape(N))
         wc_s = np.sqrt(wc)
         xfi = np.empty([2, 1])
-        for i in range(lenidf):
-            j = self.idf[i] # index of this observed feature
-            xfi[:,0] = self.xf[:,j] # get j-th feature mean
-            Pfi = self.Pf[:,:,j] # get j-th feature cov.
+
+        for i in range(lenidf):                             # each feature observed in this timestep
+            j = self.idf[i]                                 # index of this observed feature
+            xfi[:,0] = self.xf[:,j]                         # get j-th feature mean
+            Pfi = self.Pf[:,:,j]                            # get j-th feature cov.
+
             # TODO: Check why zf had dimension num_obs x 2 instead of 2 x num_obs
-            z[2 * i : 2 * i + 2, 0] = self.zf[i,:] # stack of sensory observations
+            z[2 * i : 2 * i + 2, 0] = self.zf[i,:]          # stack of sensory observations
 
             # state augmentation
-            x_aug = np.append(self.xv, xfi, axis=0)  # to add control input and observation that agree with known features
+            x_aug = np.append(self.xv, xfi, axis=0)         # to add control input and observation that agree with known features
             P_aug = np.append(
                 np.append(self.Pv, zeros((dimv, dimf)), axis=1),
                 np.append(zeros((dimf, dimv)), Pfi, axis=1),
                 axis=0
             )
-            # set sigma points
-            Ps = (self.n_aug + self.lambda_aug) * P_aug + EPS * eye(self.n_aug)
-            #Ss = np.transpose(linalg.cholesky(Ps))
+
+            # set sigma points for this feature
+            Ps = (n_aug + self.lambda_aug) * P_aug + EPS * eye(n_aug)
             Ss = linalg.cholesky(Ps)
-            Ksi = zeros((self.n_aug, 2 * self.n_aug + 1))
+            Ksi = zeros((n_aug, 2 * n_aug + 1))
             Ksi[:,0] = x_aug[:,0]
-            for k in range(self.n_aug):
+            for k in range(n_aug):
                 Ksi[:, k + 1] = x_aug[:,0] + Ss[:,k]
-                Ksi[:, k + 1 + self.n_aug] = x_aug[:,0] - Ss[:,k]
+                Ksi[:, k + 1 + n_aug] = x_aug[:,0] - Ss[:,k]
+
             # passing through observation model
-            Ai = zeros((dimf, 2 * n + 1)) # dim (measurement, number particles)
-            bs = zeros(2 * n + 1) # bearing sign
-            z_hati = zeros((2,1)) # predicted observation('dimf' by 1)
-            for k in range(2 * n + 1): # pass the sigma pts through the observation model
+            Ni = zeros((dimf, 2 * n + 1))           # dim (measurement, number particles)
+            bs = zeros(2 * n + 1)                   # bearing sign
+            n_hati = zeros((2,1))                   # predicted observation('dimf' by 1)
+            # (EQ 8)
+            for k in range(2 * n + 1):              # pass the sigma pts through the observation model
                 d = Ksi[dimv:, k] - Ksi[:dimv-1, k] # distance between particle and feature saved before
-                r = linalg.norm(d) # range
-                bearing = atan2(d[1], d[0])
+                r = linalg.norm(d)                  # theoretical range if xv was the true state
+                bearing = atan2(d[1], d[0])         # bearing
                 bs[k] = np.sign(bearing)
                 if k > 0: # unify the sign
                     if bs[k] != bs[k-1]:
@@ -252,56 +264,64 @@ class Particle:
                         elif bs[k] > 0 and pi/2 < bearing and bearing < pi:
                             bearing = bearing - 2 * pi
                             bs[k] = np.sign(bearing)
+
                 # distance + angle ; bearing ** do not use pi_to_pi here **
-                Ai[:,k] = np.append(np.array([r]),np.array([bearing - Ksi[dimv-1, k]]),axis = 0)
-                z_hati[:,0] = z_hati[:,0] + wg[k] * Ai[:,k] # predictive observation of known feature from current pose
-            z_hati_rep = np.matlib.repmat(z_hati, 1, 2 * self.n_aug + 1)
-            A[2 * i: 2 * i +2,:] = Ai - z_hati_rep # real distance with respect centre - avergae distance
+                Ni[:,k] = np.append(np.array([r]),np.array([bearing - Ksi[dimv-1, k]]),axis = 0)
+
+                # (EQ 9) - Weighted mean for each sigma point
+                n_hati[:,0] = n_hati[:,0] + wg[k] * Ni[:,k] # predictive observation of known feature from current pose
+
+            n_hati_rep = np.matlib.repmat(n_hati, 1, 2 * self.n_aug + 1)
+            N[2 * i: 2 * i +2,:] = Ni - n_hati_rep  # Innovation, N_t - n_t
 
             for k in range(2 * n + 1):
-                # CHANGED WITH RESPECT MATLAB IMPLEMENTATION
-                A_eval[2 * i: 2 * i + 2, k] = A[2 * i: 2 * i + 2, k] * wc_s[k]
+                N_eval[2 * i: 2 * i + 2, k] = N[2 * i: 2 * i + 2, k] * wc_s[k]
                 
-            z_hati[1] = pi_to_pi(z_hati[1]) # now use pi_to_pi for angle with respect car of possible landmark
-            z_hat[2 * i: 2 * i + 2,:] = z_hati
+            n_hati[1] = pi_to_pi(n_hati[1]) # now use pi_to_pi for angle with respect car of possible landmark
+            n_hat[2 * i: 2 * i + 2,:] = n_hati
 
-        # augmented noise matrix
+        # Augmented noise matrix
         R_aug = zeros((dimf * lenidf, dimf * lenidf))
         for i in range(lenidf):
             R_aug[2 * i: 2 * i + 2, 2 * i: 2 * i + 2] = self.Re
 
-        # innovation covariance (THERE IS AN ISSUE)
-        S = np.dot(A_eval, np.transpose(A_eval)) # vehicle uncertainty + map + measurement noise
-        S = (S + np.transpose(S))*0.5 + R_aug  # make symmetric for better numerical stability
-        # cross covariance: considering vehicle uncertainty
+        # (EQ 10) - Innovation covariance
+        S = np.dot(N_eval, np.transpose(N_eval))        # vehicle uncertainty + map + measurement noise
+        S = (S + np.transpose(S))*0.5 + R_aug           # make symmetric for better numerical stability
+
+        # Cross covariance: considering vehicle uncertainty
         X = zeros((dimv, 2 * n + 1)) # stack
-        #print(np.shape(self.xv), np.shape(Ksi[:3, 1] ))
         for k in range(2 * n + 1):
             ksi_aux = Ksi[:3, k].reshape((3,1))
-            X[:,k] = np.squeeze(wc_s[k] * (ksi_aux - self.xv))
-        U = np.dot(X , np.transpose(A_eval)) # cross covariance matrix ('dimv' by 'dimf * lenidf')
+            X[:,k] = np.squeeze(wc_s[k] * (ksi_aux - self.xv))  # vehicle uncertainty
 
-        # Kalman gain
-        K = np.dot(U, linalg.inv(S))
+        # (EQ 11)
+        Sigma = np.dot(X , np.transpose(N_eval))            # cross covariance matrix ('dimv' by 'dimf * lenidf')
+
+        # (EQ 12) Kalman gain
+        K = Sigma.dot(linalg.inv(S))
 
         # innovation('dimf*lenidf' by 1)
-        v = z - z_hat
+        v = z - n_hat
         for i in range(lenidf):
             v[2 * i] = pi_to_pi(v[2 * i])
-        # standard Kalman update
-        xv = self.xv + np.dot(K,v)
-        Pv = self.Pv - np.dot(K, U.T) # same as - Pv1 = self.Pv - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
 
-        # compute weight(parallel process): ERB for SLAM problem
-        Lt = S
-        #Lt = linalg.multi_dot([np.transpose(U), linalg.inv(Pv), U]) + S # square matrix of 'dimf*lenidf'
-        den = sqrt(2 * pi * linalg.det(Lt)) # TODO: LT SOMETIMES NEGATIVE !!!!!!!! eq. 25 in the paper
+        # (EQ 13) Standard Kalman update
+        xv = self.xv + K.dot(v)
+        # (EQ 14)
+        Pv = self.Pv - K.dot(Sigma.T) # same as - Pv1 = self.Pv - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION
+
+
+        # Update weights (parallel process): ERB for SLAM problem
+        Lt = S                                             # faster...
+        #Lt = (Sigma.T.dot(linalg.inv(Pv))).dot(Sigma) + S   # square matrix of 'dimf*lenidf'
+        den = sqrt(2 * pi * linalg.det(Lt))
         num = exp(-0.5 * linalg.multi_dot([np.transpose(v), linalg.inv(Lt), v]))
         w = num / den
         self.w = self.w * w
 
-        # sample from proposal distribution
-        xvs = self.__multivariate_gauss(xv, Pv)
+        # (EQ 15) sample vehicle state from proposal distribution
+        xvs = np.random.multivariate_normal(np.squeeze(xv), Pv)
         self.xv = xvs
         self.Pv = eye(3) * EPS # initialize covariance
 
@@ -320,21 +340,16 @@ class Particle:
         wg_f_a = Particle.wg_f_a
         wc_f_a = Particle.wc_f_a
 
+
     def augment_map(self):
         #if len(self.zn) != 0: # new features seen that are not still saved
         if len(self.zf) == 0: # Sample from proposal distribution, if we have not already done so above. Gets inside
             # if already features saved
-            self.xv = self.__multivariate_gauss(self.xv, self.Pv)
+            self.xv = np.random.multivariate_normal(np.squeeze(self.xv), self.Pv)
             self.Pv = EPS * eye(3)
         self.__add_feature()
 
-    def __multivariate_gauss(self,x, P):
-        """
-        Random sample from multivariate Gaussian distribution.
-        :param x: mean vector
-        :param P: covariance
-        """
-        return np.random.multivariate_normal(np.squeeze(x), P)
+
 
     def __add_feature(self):
         """
