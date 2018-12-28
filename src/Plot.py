@@ -1,8 +1,6 @@
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-#if plt.get_backend()=="MacOSX":
-#   mp.set_start_method("forkserver")
 import Constants as C
 import numpy as np
 from numpy import linalg
@@ -73,7 +71,7 @@ class ProcessPlotter (object):
                 self.__plot_ground_truth(msg.time)
                 self.__plot_features(msg.particles)
                 self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
-                self.__plot_covariance_ellipse(msg.particles)
+                #self.__plot_covariance_ellipse(msg.particles)
             plt.draw()
         return True
 
