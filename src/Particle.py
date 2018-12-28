@@ -319,6 +319,63 @@ class Particle:
         lmb = Particle.lambda_f_a
         wg_f_a = Particle.wg_f_a
         wc_f_a = Particle.wc_f_a
+        dimf = self.zf.shape[1] # feature state dimension
+        xf = self.xf[:, self.idf]
+        Pf = self.Pf[:,:, self.idf]
+        # HARDCODED VALUES JUST FOR TESTING
+        #self.xv[0] = 0.169956293382486
+        #self.xv[1] = 5.540053567362944e-04
+        #self.xv[2] = 1.443584553182200e-04
+        for i in range(len(self.idf)):
+            # augmented feature state
+            xf_aug = np.append(xf[:,i].reshape((2,1)), zeros((2, 1)), axis=0)  # to add control input and observation that agree with known features
+            Pf_aug = np.append(
+                np.append(Pf[:,:,i], zeros((2, 2)), axis=1),
+                np.append(zeros((2, 2)), R, axis=1),
+                axis=0
+            )
+            # disassemble the covariance
+            P = (N + lmb) * Pf_aug + EPS * eye(N)
+            S = linalg.cholesky(P)
+            # get sigma points
+            Kai = zeros((N, 2 * N + 1))
+            Kai[:, 0] = xf_aug[:, 0]
+            for k in range(N):
+                Kai[:, k + 1] = xf_aug[:, 0] + S[:, k] # equation 18
+                Kai[:, k + 1 + N] = xf_aug[:, 0] - S[:, k] # equation 18
+            # transform the sigma points
+            Z = zeros((dimf, 2 * N + 1))
+            bs = zeros((1, 2 * N + 1)) # bearing sign
+            for k in range(2 * N + 1):
+                d = Kai[0:2, k] - self.xv[0: 2]
+                r = sqrt(d[0]**2 + d[1]**2) + Kai[2, k] # predicted distance
+                bearing = atan2(d[1], d[0])
+                bs[0,k] = np.sign(bearing)
+                if k > 0:  # unify the sign
+                    if bs[0,k] != bs[0,k - 1]:
+                        if bs[0,k] < 0 and -pi < bearing and bearing < -pi / 2:
+                            bearing = bearing + 2 * pi
+                            bs[0,k] = np.sign(bearing)
+                        elif bs[0,k] > 0 and pi / 2 < bearing and bearing < pi:
+                            bearing = bearing - 2 * pi
+                            bs[0,k] = np.sign(bearing)
+                Z[:, k] = np.append(np.array([r]), np.array([bearing - self.xv[2] + Kai[3,k]]), axis=0) # h(lambda, x) in paper
+            z_hat = 0 # predictive observation
+            for k in range(2 * N + 1):
+                z_hat = z_hat + wg_f_a[0,k] * Z[:,k]
+            St = 0 # innovation covariance
+            for k in range(2 * N + 1):
+                St = St + wc_f_a[0,k] * (Z[:,k] - z_hat).reshape((2,1))*np.transpose((Z[:,k] - z_hat).reshape((2,1)))
+            St = (St + np.transpose(St)) * 0.5 # make symetric
+            Sigma = 0 # cross covariance
+            for k in range(2 * N + 1):
+                Sigma = Sigma + wc_f_a[0,k] * (Kai[0:2, k] - xf[:,i]).reshape((2,1))*np.transpose((Z[:,k] - z_hat).reshape((2,1))) # equation 19
+            v = self.zf[i,:] - z_hat
+            v[1] = pi_to_pi(v[1])
+            # Kalman gain
+            Kt = np.dot(Sigma, linalg.inv(St))
+            self.xf[:,self.idf[i]] = self.xf[:,self.idf[i]] + np.dot(Kt,v) # equation 20
+            self.Pf[:,:,self.idf[i]] = self.Pf[:,:,self.idf[i]] - linalg.multi_dot([Kt,St,np.transpose(Kt)]) # equation 21
 
     def augment_map(self):
         #if len(self.zn) != 0: # new features seen that are not still saved
