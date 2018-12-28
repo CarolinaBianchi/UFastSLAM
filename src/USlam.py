@@ -152,5 +152,7 @@ def main():
     #plt.show()
 
 if __name__ == "__main__":
+    if plt.get_backend() == "MacOSX":
+        mp.set_start_method("forkserver")
     main()
 
