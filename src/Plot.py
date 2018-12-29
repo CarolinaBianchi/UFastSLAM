@@ -9,14 +9,12 @@ from math import sin, cos, atan, pi
 from matplotlib import collections  as mc
 from scipy.linalg import schur
 
-
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
 alfa = atan(-22/28)
 c = cos(alfa)
 s = sin(alfa)
-
 class ProcessPlotter (object):
     def __init__(self):
         self.errcount = 0
@@ -66,15 +64,15 @@ class ProcessPlotter (object):
         while self.pipe.poll():
             msg = self.pipe.recv()
             if msg is None:
-                break
+                return False
             else:
                 self.__plot_epath(msg.particles)
-                #self.__plot_ground_truth(msg.time)
+                self.__plot_ground_truth(msg.time)
                 self.__plot_features(msg.particles)
                 self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
                 self.__plot_covariance_ellipse(msg.particles)
             plt.draw()
-        return True
+            return True
 
     def __call__(self, pipe):
         print('starting plotter...')
