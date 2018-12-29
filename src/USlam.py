@@ -9,6 +9,7 @@ from Plot import ProcessPlotter
 from Message import Message
 import multiprocessing as mp
 import time
+import sys
 
 import matplotlib.pyplot as plt
 
@@ -143,7 +144,7 @@ def main():
                 particle.predictACFRu(ctrlData)
 
             # Measurement
-            z = FrontEnd.filter(sensor.read(t, C.T[i + 1]))
+            z = FrontEnd.filter(sensor.read(t, C.T[i + 1])) # TODO: In case speed at last time is different 0 would crash
 
             if size(z):
                 # Data associations
@@ -167,11 +168,13 @@ def main():
                     if particle.zn.size:
                         particle.augment_map()
 
-
-    #plt.show()
+    plot_pipe.send(True) # some message so the process knows is the end and send the figure
+    figure = plot_pipe.recv()
+    figure.savefig('results/uslam_map_victoria.png')
+    # plot_pipe.join() # Not necessary
 
 if __name__ == "__main__":
-    if plt.get_backend() == "MacOSX":
+    if sys.platform != 'win32': # solve compatibility issues with Mac, TODO: Check if we need to exclude Ubuntu as well
         mp.set_start_method("forkserver")
     main()
 

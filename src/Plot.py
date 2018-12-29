@@ -29,12 +29,11 @@ class ProcessPlotter (object):
         self.line_col = None
 
         #Initialize figures
-        self.fig1, self.ax1 = plt.subplots()
-        axes = plt.gca()
-        axes.set_xlim(-150, 250)
-        axes.set_ylim(-100, 250)
+        self.fig, ((self.ax1, self.ax2)) = plt.subplots(1, 2)
+        self.ax1.set_xlim(-150, 250)
+        self.ax1.set_ylim(-150, 250)
+        self.ax2.set_ylim(0,30)
 
-        self.fig2, self.ax2 = plt.subplots()
 
         self.line, = self.ax1.plot([], [], 'r-')
         self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
@@ -65,12 +64,14 @@ class ProcessPlotter (object):
             msg = self.pipe.recv()
             if msg is None:
                 return False
-            else:
+            elif msg.__class__ == Message.Message: # check it is a Message class
                 self.__plot_epath(msg.particles)
                 self.__plot_ground_truth(msg.time)
                 self.__plot_features(msg.particles)
                 self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
                 self.__plot_covariance_ellipse(msg.particles)
+            else: # needs to be the message showing the end of the program
+                self.pipe.send(self.fig)
             plt.draw()
             return True
 
@@ -78,7 +79,7 @@ class ProcessPlotter (object):
         print('starting plotter...')
 
         self.pipe = pipe
-        timer = self.fig1.canvas.new_timer(interval=10)
+        timer = self.fig.canvas.new_timer(interval=10)
         timer.add_callback(self.call_back)
         timer.start()
 
@@ -145,7 +146,7 @@ class ProcessPlotter (object):
         Plots the ground truth up to a certain time instant.
         :param time: current time instant.
         """
-        i =0
+        i = 0
         while(self.gttime[0]<time):
             self.xgt.append(self.gtx[0]*c-self.gty[0]*s)
             self.ygt.append(self.gtx[0]*s+self.gty[0]*c)
