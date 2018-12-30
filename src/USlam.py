@@ -108,22 +108,6 @@ def stratified_random(N):
     return s
 
 
-"""
-def init_animation():
-    # Initialize animation
-    x = []
-    y = []
-
-def animate(epath):
-    y.append(epath[1][1])  # update the data.
-    x.append(epath[1][0])  # update the data.
-
-def do_plot(particles, plines, epath):
-    xfp = [particle.xf for particle in particles]
-    w = [particle.w for particle in particles]
-    ii = np.where(w == max(w))[0]
-    # TODO: Add animations
-"""
 epath = []
 def main():
 
@@ -133,9 +117,9 @@ def main():
     particles = init_particles(C.NPARTICLES)
     plot_pipe, plotter_pipe = mp.Pipe()
     plotter = ProcessPlotter()
-    plot_process = mp.Process(
+    """plot_process = mp.Process(
        target=plotter, args=(plotter_pipe,), daemon=True)
-    plot_process.start()
+    plot_process.start()"""
 
     #time.sleep(20)
     for i, t in enumerate(C.T):
@@ -165,7 +149,7 @@ def main():
                         particle.feature_updateu()
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
-
+                plotter.update(get_message(particles, z, t))
                 #Writer(get_message(particles, z, t), plot_pipe).start()
                 #plot_pipe.send(Message(particles, z, t))
 
@@ -174,7 +158,8 @@ def main():
                     if particle.zn.size:
                         particle.augment_map()
 
-    plot_pipe.send(True) # some message so the process knows is the end and send the figure
+    #plot_pipe.send(True) # some message so the process knows is the end and send the figure
+
     #figure = plot_pipe.recv()
     #figure.savefig('results/uslam_map_victoria.png')
     """ffeatures = open("est_features.txt")

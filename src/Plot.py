@@ -41,6 +41,9 @@ class ProcessPlotter (object):
         self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
         self.oldFeatures = self.ax1.scatter([],[])
 
+        plt.ion()
+        plt.show()
+
 
     def init_ground_truth(self):
         f = open(PATH+GPS)
@@ -57,11 +60,23 @@ class ProcessPlotter (object):
     def terminate(self):
         plt.close('all')
 
-    def call_back(self):
+    def update(self, msg):
+        self.__plot_epath(msg.xv)
+        self.__plot_ground_truth(msg.time)
+
+        self.__plot_laser(msg.z, msg.xv)
+        if len(msg.xf):
+            self.__plot_features(msg.xf)
+            self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
+        plt.draw()
+        plt.pause(1e-15)
+
+    #def call_back(self):
         """
         Callback of a timer. While polling this method checks if there is any new data to be plotted.
         :return:
         """
+    """
         while self.pipe.poll():
             msg = self.pipe.recv()
             if msg is None:
@@ -90,7 +105,7 @@ class ProcessPlotter (object):
 
         print('...done')
         plt.show()
-
+    """
     def __plot_epath(self, xv):
         """
         Plots the estimated path.
