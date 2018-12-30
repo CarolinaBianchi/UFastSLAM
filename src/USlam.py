@@ -11,20 +11,8 @@ import multiprocessing as mp
 import time
 import sys
 from PipeWriter import Writer
-
-import matplotlib.pyplot as plt
-
-
-
-from math import sin, cos, nan
-
 import numpy as np
 from numpy import zeros, eye, size, linalg
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import time
-
-
 
 def init_particles(npart):
     w = 1 / npart
@@ -107,23 +95,6 @@ def stratified_random(N):
     s = di + np.random.rand(N) * k - k / 2  # dither within interval
     return s
 
-
-"""
-def init_animation():
-    # Initialize animation
-    x = []
-    y = []
-
-def animate(epath):
-    y.append(epath[1][1])  # update the data.
-    x.append(epath[1][0])  # update the data.
-
-def do_plot(particles, plines, epath):
-    xfp = [particle.xf for particle in particles]
-    w = [particle.w for particle in particles]
-    ii = np.where(w == max(w))[0]
-    # TODO: Add animations
-"""
 epath = []
 def main():
 
@@ -137,11 +108,9 @@ def main():
        target=plotter, args=(plotter_pipe,), daemon=True)
     plot_process.start()
 
-    #time.sleep(20)
     for i, t in enumerate(C.T):
         ctrlData = ctrl.read(t)
-        if i > 10000:
-            break
+
         if (ctrlData.speed != 0):
             # Prediction
             for particle in particles:
@@ -166,8 +135,7 @@ def main():
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
 
-                #Writer(get_message(particles, z, t), plot_pipe).start()
-                #plot_pipe.send(Message(particles, z, t))
+                Writer(get_message(particles, z, t), plot_pipe).start()
 
                 # When new feautres are observed, augment it ot the map
                 for particle in particles:
@@ -175,16 +143,8 @@ def main():
                         particle.augment_map()
 
     plot_pipe.send(True) # some message so the process knows is the end and send the figure
-    #figure = plot_pipe.recv()
-    #figure.savefig('results/uslam_map_victoria.png')
-    """ffeatures = open("est_features.txt")
-    ws = [particle.w for particle in particles]
-    maxInd = ws.index(max(ws))
-    particle = particles[maxInd]
-    for x in particle.xf:
-        ffeatures.write("%f\n", x)
-    ffeatures.close()"""
-    # plot_pipe.join() # Not necessary
+    figure = plot_pipe.recv()
+    figure.savefig('results/uslam_map_victoria.png')
 
 def get_message(particles, z, t):
     # Estimated path:

@@ -16,7 +16,6 @@ alfa = atan(-19/28)
 alfa = atan(-37/48)
 c = cos(alfa)
 s = sin(alfa)
-#ferr = open('error.txt')
 class ProcessPlotter (object):
     def __init__(self):
         self.errcount = 0
@@ -146,8 +145,7 @@ class ProcessPlotter (object):
         e = (d[0]*d[0]+d[1]*d[1])**0.5
         self.ax2.scatter(self.errcount, e, color = 'blue')
         self.errcount = self.errcount+1
-        """global ferr
-        ferr.write("%f\n" %e)"""
+
 
     def __plot_laser(self, z, xv):
         lines = self.make_laser_lines(z, xv)
