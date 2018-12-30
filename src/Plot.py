@@ -167,18 +167,15 @@ class ProcessPlotter (object):
         return data
 
     def __plot_covariance_ellipse(self, xv, Pv, xf, Pf):
-         N = 10 # number of points ellipse
-         phi = np.array(np.linspace(0, 2 * pi, N, endpoint=True))
-         circ = 2 * np.array([np.cos(phi), np.sin(phi)])
-         self.make_ellipse(xv, Pv, xf, Pf, circ)
-
-    def make_ellipse(self, xv, Pv, xf, Pf, circ): # if integ 0 plot cov of vehicle, if 1 landmark covariance
+        N = 10 # number of points ellipse
+        phi = np.array(np.linspace(0, 2 * pi, N, endpoint=True))
+        circ = 2 * np.array([np.cos(phi), np.sin(phi)])
         for c in self.covariances:
             c.remove()
         self.covariances = []
         cov_veh_plot = self.obtain_squared_P(Pv[:2,:2], circ, xv[:2]) # plot the covariance of the vehicle position
         self.covariances.append(cov_veh_plot) # to remove it when redrawing
-        for i in range(np.size(xf, 1)):  # number of known features
+        for i in range(len(xf)):  # number of known features
             cov_feat_plot = self.obtain_squared_P(Pf[i][:2, :2], circ, xf[i][:2]) # plot the covariance of the features
             self.covariances.append(cov_feat_plot)  # to remove it when redrawing
 

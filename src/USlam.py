@@ -159,12 +159,9 @@ def get_message(particles, z, t):
 
 def __get_features(maxP):
     f, P = [],[]
-    for xf in maxP.xf.T:
-        if xf.size:
-            f.append(xf)
-    for Pf in maxP.Pf:
-        if Pf.size:
-            P.append(Pf)
+    if maxP.xf.T.size:
+        f = [xf for xf in maxP.xf.T]
+        P = [Pf for Pf in maxP.Pf.T]
     return f, P
 
 def __get_epath(particles, maxInd):
