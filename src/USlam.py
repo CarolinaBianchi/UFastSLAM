@@ -8,7 +8,7 @@ from Plot import ProcessPlotter
 from Message import Message
 import multiprocessing as mp
 import sys
-
+import time
 import numpy as np
 from numpy import zeros, eye, size, linalg
 
@@ -104,15 +104,9 @@ def main():
     particles = init_particles(C.NPARTICLES)
     plot_pipe, plotter_pipe = mp.Pipe()
     plotter = ProcessPlotter()
-    """plot_process = mp.Process(
-       target=plotter, args=(plotter_pipe,), daemon=True)
-    plot_process.start()"""
 
-    #time.sleep(20)
     for i, t in enumerate(C.T):
         ctrlData = ctrl.read(t)
-        if i > 10000:
-            break
         if (ctrlData.speed != 0):
             # Prediction
             for particle in particles:
@@ -147,6 +141,7 @@ def main():
 
     #figure = plot_pipe.recv()
     #figure.savefig('results/uslam_map_victoria.png')
+    plotter.terminate()
 
 def get_message(particles, z, t):
     # Estimated path:

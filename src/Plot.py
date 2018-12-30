@@ -8,7 +8,7 @@ import Message
 from math import sin, cos, atan, pi
 from matplotlib import collections  as mc
 from scipy.linalg import schur
-
+import time
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
@@ -16,10 +16,12 @@ alfa = atan(-19/28)
 alfa = atan(-37/48)
 c = cos(alfa)
 s = sin(alfa)
-#ferr = open('error.txt')
+ferr = open('output/error.txt', "w+")
+
 class ProcessPlotter (object):
     def __init__(self):
         self.errcount = 0
+        self.err = []
         self.epath = []
         self.xdata = []
         self.ydata = []
@@ -45,6 +47,7 @@ class ProcessPlotter (object):
         plt.show()
 
 
+
     def init_ground_truth(self):
         f = open(PATH+GPS)
         data = [[float(num) for num in line.split(',') if len(num) > 0] for line in f]
@@ -58,6 +61,8 @@ class ProcessPlotter (object):
         return t, x, y
 
     def terminate(self):
+        ferr.close()
+        self.fig.savefig('output/uslam_map_victoria.png')
         plt.close('all')
 
     def update(self, msg):
@@ -125,7 +130,11 @@ class ProcessPlotter (object):
         d = xv_hat-xv_gps
         e = (d[0]*d[0]+d[1]*d[1])**0.5
         self.ax2.scatter(self.errcount, e, color = 'blue')
-        self.errcount = self.errcount+1
+        if self.errcount % 100 == 0:
+            s = 'output/screen'+str(self.errcount)+'.png'
+            self.fig.savefig(s)
+        self.errcount = self.errcount + 1
+        ferr.write("%f\n" %e)
 
 
     def __plot_laser(self, z, xv):
