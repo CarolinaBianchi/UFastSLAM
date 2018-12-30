@@ -36,7 +36,7 @@ NEFFECTIVE= 0.5*NPARTICLES # minimum number of effective particles
 
 # Data association - innovation gates (Mahalanobis distance)
 GATE_REJECT= 5.991     # maximum distance for association
-GATE_AUGMENT_NN= 200  # minimum distance for creation of new feature
+GATE_AUGMENT_NN= 2000  # minimum distance for creation of new feature
 GATE_AUGMENT= 100      # minimum distance for creation of new feature (100)
 
 # Parameters related to SUT

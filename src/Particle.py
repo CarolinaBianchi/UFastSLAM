@@ -25,7 +25,7 @@ class Particle:
     wc = C.wc_r
     Re = C.Re # Observation(measurement) noises covariance
     GATE_REJECT = C.GATE_REJECT
-    GATE_AUGMENT = C.GATE_AUGMENT
+    GATE_AUGMENT = C.GATE_AUGMENT_NN
     n_aug = C.n_aug # dimv + dimf
     lambda_aug = C.lambda_aug
     wg_aug = C.wg_aug
