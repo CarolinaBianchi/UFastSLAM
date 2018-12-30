@@ -12,9 +12,11 @@ from scipy.linalg import schur
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
-alfa = atan(-22/28)
+alfa = atan(-19/28)
+alfa = atan(-37/48)
 c = cos(alfa)
 s = sin(alfa)
+#ferr = open('error.txt')
 class ProcessPlotter (object):
     def __init__(self):
         self.errcount = 0
@@ -65,13 +67,16 @@ class ProcessPlotter (object):
             if msg is None:
                 return False
             elif msg.__class__ == Message.Message: # check it is a Message class
-                self.__plot_epath(msg.particles)
+                self.__plot_epath(msg.xv)
                 self.__plot_ground_truth(msg.time)
-                self.__plot_features(msg.particles)
-                self.__plot_laser(msg.z, [self.xdata[-1], self.ydata[-1], self.theta[-1]])
-                self.__plot_covariance_ellipse(msg.particles)
+
+                self.__plot_laser(msg.z, msg.xv)
+                if len(msg.xf):
+                    self.__plot_features(msg.xf)
+                    self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
             else: # needs to be the message showing the end of the program
-                self.pipe.send(self.fig)
+                #self.pipe.send(self.fig)
+                pass
             plt.draw()
             return True
 
@@ -86,13 +91,13 @@ class ProcessPlotter (object):
         print('...done')
         plt.show()
 
-    def __plot_epath(self, particles):
+    def __plot_epath(self, xv):
         """
         Plots the estimated path.
         :param particles:
         :return:
         """
-        self.epath = self.__get_epath(self.epath, particles, C.NPARTICLES)
+        self.epath = xv
         self.xdata.append(self.epath[0])
         self.ydata.append(self.epath[1])
         self.theta.append(self.epath[2])
@@ -100,44 +105,18 @@ class ProcessPlotter (object):
         self.line.set_ydata(self.ydata)
         #plt.pause(1e-15)
 
-    def __get_epath(self, epath, particles,  NPARTICLES):
-        """
-        Gets the estimated path.
-        :param epath: path up to this point.
-        :param particles:
-        :param NPARTICLES:
-        :return:
-        """
-        # vehicle state estimation result
-        xvp = [particle.xv for particle in particles]
-        w = [particle.w for particle in particles]
-        ws = np.sum(w)
-        w = w / ws # normalize
-        # weighted mean vehicle pose
-        xvmean = 0
-        for i in range(NPARTICLES):
-            contribution = np.squeeze(xvp[i]) # TODO: Check why in a certain step we have particle[0] xvp as 3x1 and the rest 1x3
-            xvmean = xvmean + w[i] * contribution
-        # keep the pose for recovering estimation trajectory
-        return xvmean
-
-    def __plot_features(self, particles):
+    def __plot_features(self, xf):
         """
         Plots the features.
         :param particles:
         :return:
         """
         self.oldFeatures.remove()
-        x = []
-        y = []
-        ws = [particle.w for particle in particles]
-        maxInd = ws.index(max(ws))
-        maxP = particles[maxInd]
-
-        for xf in maxP.xf.T:
-            if xf.size:
-                x.append(xf[0])
-                y.append(xf[1])
+        x, y = [], []
+        for f in xf:
+            if len(xf):
+                x.append(f[0])
+                y.append(f[1])
         self.oldFeatures = self.ax1.scatter(x, y, s=1, color='black')
 
 
@@ -167,12 +146,14 @@ class ProcessPlotter (object):
         e = (d[0]*d[0]+d[1]*d[1])**0.5
         self.ax2.scatter(self.errcount, e, color = 'blue')
         self.errcount = self.errcount+1
+        """global ferr
+        ferr.write("%f\n" %e)"""
 
     def __plot_laser(self, z, xv):
         lines = self.make_laser_lines(z, xv)
         if self.line_col != None : #remove previous laser lines
             self.line_col.remove()
-        lc = mc.LineCollection(lines, colors = np.array((0, 1, 0, 1)), linewidths=2)
+        lc = mc.LineCollection(lines, colors = np.array(('yellow', 'yellow', 'yellow', 'yellow')), linewidths=2)
         self.ax1.add_collection(lc)
         self.line_col = lc
 
@@ -206,31 +187,20 @@ class ProcessPlotter (object):
             # data.append((lnes_end_pos[0][i], lnes_end_pos[1][i]))
         return data
 
-    def __plot_covariance_ellipse(self, particles):
+    def __plot_covariance_ellipse(self, xv, Pv, xf, Pf):
          N = 10 # number of points ellipse
          phi = np.array(np.linspace(0, 2 * pi, N, endpoint=True))
          circ = 2 * np.array([np.cos(phi), np.sin(phi)])
-         self.make_ellipse(particles, circ)
+         self.make_ellipse(xv, Pv, xf, Pf, circ)
 
-    def make_ellipse(self, particles, circ): # if integ 0 plot cov of vehicle, if 1 landmark covariance
-        # TODO: Remove previous covariances
-        """
-        for cov in self.covariances:
-            print(cov)
-            cov.remove() # FAIL: Check how to remove previous covariance plots
-        """
-        #Take only particle with maximum weight - as what was done with the features
-        ws = [particle.w for particle in particles]
-        maxInd = ws.index(max(ws))
-        particle = particles[maxInd]
-
+    def make_ellipse(self, xv, Pv, xf, Pf, circ): # if integ 0 plot cov of vehicle, if 1 landmark covariance
         for c in self.covariances:
             c.remove()
         self.covariances = []
-        cov_veh_plot = self.obtain_squared_P(particle.Pv[:2,:2], circ, particle.xv[:2]) # plot the covariance of the vehicle position
+        cov_veh_plot = self.obtain_squared_P(Pv[:2,:2], circ, xv[:2]) # plot the covariance of the vehicle position
         self.covariances.append(cov_veh_plot) # to remove it when redrawing
-        for i in range(np.size(particle.xf, 1)):  # number of known features
-            cov_feat_plot = self.obtain_squared_P(particle.Pf[:2, :2, i], circ, particle.xf[:2,i]) # plot the covariance of the features
+        for i in range(np.size(xf, 1)):  # number of known features
+            cov_feat_plot = self.obtain_squared_P(Pf[i][:2, :2], circ, xf[i][:2]) # plot the covariance of the features
             self.covariances.append(cov_feat_plot)  # to remove it when redrawing
 
     def obtain_squared_P(self, P, circ, pos):
@@ -252,7 +222,7 @@ class ProcessPlotter (object):
         position = np.squeeze(pos) # TODO: Check why sometimes xv has dimension (2,1) and sometimes (2,)
         position = position.reshape((2, 1))
         p = a + np.matlib.repmat(position, 1, a.shape[1])
-        p1 = self.ax1.scatter(p[0], p[1], s=1, color='yellow') # TODO: Check if you can provide array vectors instead of integers
+        p1 = self.ax1.scatter(p[0], p[1], s=1, color='green') # TODO: Check if you can provide array vectors instead of integers
         return p1
 
     def TransformToGlobal(self, p, b):

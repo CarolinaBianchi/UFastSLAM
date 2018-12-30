@@ -10,6 +10,7 @@ from Message import Message
 import multiprocessing as mp
 import time
 import sys
+from PipeWriter import Writer
 
 import matplotlib.pyplot as plt
 
@@ -21,7 +22,7 @@ import numpy as np
 from numpy import zeros, eye, size, linalg
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
-
+import time
 
 
 
@@ -123,8 +124,9 @@ def do_plot(particles, plines, epath):
     ii = np.where(w == max(w))[0]
     # TODO: Add animations
 """
-
+epath = []
 def main():
+
     # Initialization
     ctrl = ControlPublisher()
     sensor = Sensor()
@@ -134,10 +136,12 @@ def main():
     plot_process = mp.Process(
        target=plotter, args=(plotter_pipe,), daemon=True)
     plot_process.start()
-    message = None
+
+    #time.sleep(20)
     for i, t in enumerate(C.T):
         ctrlData = ctrl.read(t)
-
+        if i > 10000:
+            break
         if (ctrlData.speed != 0):
             # Prediction
             for particle in particles:
@@ -161,7 +165,9 @@ def main():
                         particle.feature_updateu()
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
-                plot_pipe.send(Message(particles, z, t))
+
+                #Writer(get_message(particles, z, t), plot_pipe).start()
+                #plot_pipe.send(Message(particles, z, t))
 
                 # When new feautres are observed, augment it ot the map
                 for particle in particles:
@@ -169,9 +175,57 @@ def main():
                         particle.augment_map()
 
     plot_pipe.send(True) # some message so the process knows is the end and send the figure
-    figure = plot_pipe.recv()
-    figure.savefig('results/uslam_map_victoria.png')
+    #figure = plot_pipe.recv()
+    #figure.savefig('results/uslam_map_victoria.png')
+    """ffeatures = open("est_features.txt")
+    ws = [particle.w for particle in particles]
+    maxInd = ws.index(max(ws))
+    particle = particles[maxInd]
+    for x in particle.xf:
+        ffeatures.write("%f\n", x)
+    ffeatures.close()"""
     # plot_pipe.join() # Not necessary
+
+def get_message(particles, z, t):
+    # Estimated path:
+    ws = [particle.w for particle in particles]
+    maxInd = ws.index(max(ws))
+    maxP = particles[maxInd]
+    xv, Pv = __get_epath(particles, maxInd)
+    xf, Pf = __get_features(maxP)
+    return Message(xv, Pv, xf, Pf, z, t)
+
+def __get_features(maxP):
+    f, P = [],[]
+    for xf in maxP.xf.T:
+        if xf.size:
+            f.append(xf)
+    for Pf in maxP.Pf:
+        if Pf.size:
+            P.append(Pf)
+    return f, P
+
+def __get_epath(particles, maxInd):
+    """
+    Gets the estimated path.
+    :param particles:
+    :return:
+    """
+    global epath
+    # vehicle state estimation result
+    xvp = [particle.xv for particle in particles]
+    w = [particle.w for particle in particles]
+    ws = np.sum(w)
+    w = w / ws  # normalize
+    # weighted mean vehicle pose
+    xvmean = 0
+    for i, part in enumerate(particles):
+        contribution = np.squeeze(
+            xvp[i])  # TODO: Check why in a certain step we have particle[0] xvp as 3x1 and the rest 1x3
+        xvmean = xvmean + w[i] * contribution
+    # keep the pose for recovering estimation trajectory
+    epath.append(xvmean)
+    return xvmean, particles[maxInd].Pv
 
 if __name__ == "__main__":
     if sys.platform != 'win32': # solve compatibility issues with Mac, TODO: Check if we need to exclude Ubuntu as well
