@@ -4,26 +4,13 @@ from Sensor import *
 from Vehicle import *
 from FrontEnd import *
 import Constants as C
-from Utils import pi_to_pi
 from Plot import ProcessPlotter
 from Message import Message
 import multiprocessing as mp
-import time
 import sys
-from PipeWriter import Writer
-
-import matplotlib.pyplot as plt
-
-
-
-from math import sin, cos, nan
 
 import numpy as np
 from numpy import zeros, eye, size, linalg
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import time
-
 
 
 def init_particles(npart):
@@ -150,8 +137,6 @@ def main():
 
                 particles = resample_particles(particles, C.NEFFECTIVE)
                 plotter.update(get_message(particles, z, t))
-                #Writer(get_message(particles, z, t), plot_pipe).start()
-                #plot_pipe.send(Message(particles, z, t))
 
                 # When new feautres are observed, augment it ot the map
                 for particle in particles:
@@ -162,14 +147,6 @@ def main():
 
     #figure = plot_pipe.recv()
     #figure.savefig('results/uslam_map_victoria.png')
-    """ffeatures = open("est_features.txt")
-    ws = [particle.w for particle in particles]
-    maxInd = ws.index(max(ws))
-    particle = particles[maxInd]
-    for x in particle.xf:
-        ffeatures.write("%f\n", x)
-    ffeatures.close()"""
-    # plot_pipe.join() # Not necessary
 
 def get_message(particles, z, t):
     # Estimated path:

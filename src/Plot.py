@@ -71,41 +71,6 @@ class ProcessPlotter (object):
         plt.draw()
         plt.pause(1e-15)
 
-    #def call_back(self):
-        """
-        Callback of a timer. While polling this method checks if there is any new data to be plotted.
-        :return:
-        """
-    """
-        while self.pipe.poll():
-            msg = self.pipe.recv()
-            if msg is None:
-                return False
-            elif msg.__class__ == Message.Message: # check it is a Message class
-                self.__plot_epath(msg.xv)
-                self.__plot_ground_truth(msg.time)
-
-                self.__plot_laser(msg.z, msg.xv)
-                if len(msg.xf):
-                    self.__plot_features(msg.xf)
-                    self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
-            else: # needs to be the message showing the end of the program
-                #self.pipe.send(self.fig)
-                pass
-            plt.draw()
-            return True
-
-    def __call__(self, pipe):
-        print('starting plotter...')
-
-        self.pipe = pipe
-        timer = self.fig.canvas.new_timer(interval=10)
-        timer.add_callback(self.call_back)
-        timer.start()
-
-        print('...done')
-        plt.show()
-    """
     def __plot_epath(self, xv):
         """
         Plots the estimated path.
@@ -161,8 +126,7 @@ class ProcessPlotter (object):
         e = (d[0]*d[0]+d[1]*d[1])**0.5
         self.ax2.scatter(self.errcount, e, color = 'blue')
         self.errcount = self.errcount+1
-        """global ferr
-        ferr.write("%f\n" %e)"""
+
 
     def __plot_laser(self, z, xv):
         lines = self.make_laser_lines(z, xv)
