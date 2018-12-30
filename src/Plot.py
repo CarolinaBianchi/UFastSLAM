@@ -13,7 +13,7 @@ PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
 alfa = atan(-19/28)
-alfa = atan(-37/48)
+alfa = atan(-0.71)
 c = cos(alfa)
 s = sin(alfa)
 ferr = open('output/error.txt', "w+")
@@ -66,13 +66,12 @@ class ProcessPlotter (object):
         plt.close('all')
 
     def update(self, msg):
-        self.__plot_epath(msg.xv)
-        self.__plot_ground_truth(msg.time)
+        self.epath = msg.xv
+        self.xdata.append(self.epath[0])
+        self.ydata.append(self.epath[1])
+        self.theta.append(self.epath[2])
+        self.__plot_ground_truth(msg.time, msg)
 
-        self.__plot_laser(msg.z, msg.xv)
-        if len(msg.xf):
-            self.__plot_features(msg.xf)
-            self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
         plt.draw()
         plt.pause(1e-15)
 
@@ -82,10 +81,6 @@ class ProcessPlotter (object):
         :param particles:
         :return:
         """
-        self.epath = xv
-        self.xdata.append(self.epath[0])
-        self.ydata.append(self.epath[1])
-        self.theta.append(self.epath[2])
         self.line.set_xdata(self.xdata)
         self.line.set_ydata(self.ydata)
         #plt.pause(1e-15)
@@ -105,7 +100,7 @@ class ProcessPlotter (object):
         self.oldFeatures = self.ax1.scatter(x, y, s=1, color='black')
 
 
-    def __plot_ground_truth(self, time):
+    def __plot_ground_truth(self, time, msg):
         """
         Plots the ground truth up to a certain time instant.
         :param time: current time instant.
@@ -120,10 +115,10 @@ class ProcessPlotter (object):
             i = i+1
         self.ax1.scatter(self.xgt, self.ygt, s=1, color='blue')
         if(i): # horrible.
-            self.__plot_error([self.xgt[-1], self.ygt[-1]])
+            self.__plot_error([self.xgt[-1], self.ygt[-1]], msg)
 
 
-    def __plot_error(self, xv_gps):
+    def __plot_error(self, xv_gps, msg):
         xv_hat = np.array(self.epath)[0:2]
         xv_gps = np.array(xv_gps)
 
@@ -131,7 +126,12 @@ class ProcessPlotter (object):
         e = (d[0]*d[0]+d[1]*d[1])**0.5
         self.ax2.scatter(self.errcount, e, color = 'blue')
         if self.errcount % 100 == 0:
-            s = 'output/screen'+str(self.errcount)+'.png'
+            self.__plot_epath(msg.xv)
+            self.__plot_laser(msg.z, msg.xv)
+            if len(msg.xf):
+                self.__plot_features(msg.xf)
+                self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
+            s = 'output/screen' + str(self.errcount) + '.png'
             self.fig.savefig(s)
         self.errcount = self.errcount + 1
         ferr.write("%f\n" %e)
