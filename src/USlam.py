@@ -111,8 +111,8 @@ def main():
     #time.sleep(20)
     for i, t in enumerate(C.T):
         ctrlData = ctrl.read(t)
-        if i > 10000:
-            break
+        #if i > 10000:
+        #    break
         if (ctrlData.speed != 0):
             # Prediction
             for particle in particles:

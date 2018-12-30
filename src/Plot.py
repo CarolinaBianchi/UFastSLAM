@@ -12,8 +12,8 @@ from scipy.linalg import schur
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
-alfa = atan(-19/28)
 alfa = atan(-37/48)
+alfa = atan(-0.71)
 c = cos(alfa)
 s = sin(alfa)
 #ferr = open('error.txt')
