@@ -306,7 +306,8 @@ class Particle:
         for i in range(lenidf):
             v[2 * i] = pi_to_pi(v[2 * i])
 
-        # (EQ 13) Standard Kalman update
+        # (EQ 13) Standard Kƒmax
+        # date
         xv = self.xv + K.dot(v)
         # (EQ 14)
         Pv = self.Pv - K.dot(Sigma.T) # same as - Pv1 = self.Pv - linalg.multi_dot([K, S, np.transpose(K)])# CHANGED WITH RESPECT MATLAB IMPLEMENTATION

@@ -101,6 +101,8 @@ def main():
     # Initialization
     ctrl = ControlPublisher()
     sensor = Sensor()
+
+
     particles = init_particles(C.NPARTICLES)
     plot_pipe, plotter_pipe = mp.Pipe()
     plotter = ProcessPlotter()
@@ -147,6 +149,8 @@ def main():
 
     #figure = plot_pipe.recv()
     #figure.savefig('results/uslam_map_victoria.png')
+    plotter.terminate()
+
 
 def get_message(particles, z, t):
     # Estimated path:

@@ -12,14 +12,28 @@ from scipy.linalg import schur
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
 
-alfa = atan(-37/48)
+
+#alfa = atan(-19/28)
 alfa = atan(-0.71)
 c = cos(alfa)
 s = sin(alfa)
-#ferr = open('error.txt')
+ferr = open('output/error.txt', "w+")
+x_map = open('output/x_data.txt', "w+")
+y_map = open('output/y_data.txt', "w+")
+x_feat = open('output/x_feat.txt', "w+")
+y_feat = open('output/y_feat.txt', "w+")
+cov = open('output/cov.txt', "w+")
+#cov01 = open('output/cov01.txt', "w+")
+#cov10 = open('output/cov10.txt', "w+")
+#cov11 = open('output/cov11.txt', "w+")
+
 class ProcessPlotter (object):
     def __init__(self):
         self.errcount = 0
+        self.err_vect = []
+        self.error_value = []
+        self.path_count = 0
+        self.err = []
         self.epath = []
         self.xdata = []
         self.ydata = []
@@ -31,17 +45,47 @@ class ProcessPlotter (object):
         self.line_col = None
 
         #Initialize figures
+        """
         self.fig, ((self.ax1, self.ax2)) = plt.subplots(1, 2)
+        self.fig.tight_layout()  # Or equivalently,  "plt.tight_layout()"
         self.ax1.set_xlim(-150, 250)
         self.ax1.set_ylim(-150, 250)
         self.ax2.set_ylim(0,30)
+        self.ax1.set_xlabel('x [m]')
+        self.ax1.set_ylabel('y [m]')
+        self.ax2.set_xlabel('number steps')
+        self.ax2.set_ylabel('error [m]')
+        self.ax1.set_title('Result map against GT')
+        self.ax2.set_title('Error')
+        self.ax1.set_aspect('equal')
+        """
+
+        self.figtot, self.axtot = plt.subplots()
+        self.axtot.set_xlim(-150, 250)
+        self.axtot.set_ylim(-150, 250)
+        self.axtot.set_xlabel('x [m]')
+        self.axtot.set_ylabel('y [m]')
+        self.axtot.set_title('Result map against GT')
+
+        self.figerr, self.axerr = plt.subplots()
+        self.axerr.set_ylim(0, 17)
+        self.axerr.set_xlabel('number steps')
+        self.axerr.set_xlabel('number steps')
+        self.axerr.set_ylabel('error [m]')
+        self.axerr.set_title('Error')
 
 
-        self.line, = self.ax1.plot([], [], 'r-')
-        self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
-        self.oldFeatures = self.ax1.scatter([],[])
+        #self.line, = self.ax1.plot([], [], 'r-')
+        self.line, = self.axtot.plot([], [], 'r-')
+
+        # self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
+        self.gt, = self.axtot.plot(self.xgt, self.ygt, 'g-')
+        self.oldFeatures = self.axtot.scatter([],[])
+        self.olderror = self.axerr.scatter([],[])
 
         plt.ion()
+        mng = plt.get_current_fig_manager()
+        mng.window.state('zoomed')
         plt.show()
 
 
@@ -58,18 +102,33 @@ class ProcessPlotter (object):
         return t, x, y
 
     def terminate(self):
+        ferr.close()
+        x_map.close()
+        y_map.close()
+
+        self.figtot.savefig('output50/uslam_map_victoria.png')
         plt.close('all')
 
     def update(self, msg):
-        self.__plot_epath(msg.xv)
-        self.__plot_ground_truth(msg.time)
-
-        self.__plot_laser(msg.z, msg.xv)
-        if len(msg.xf):
-            self.__plot_features(msg.xf)
-            self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
+        self.epath = msg.xv
+        self.xdata.append(self.epath[0])
+        self.ydata.append(self.epath[1])
+        self.theta.append(self.epath[2])
+        self.__plot_ground_truth(msg.time, msg)
         plt.draw()
         plt.pause(1e-15)
+
+    def save_feat(self, particles):
+        ws = [particle.w for particle in particles]
+        maxInd = ws.index(max(ws))
+        maxP = particles[maxInd]
+        for i in len(maxP.xf):
+            x_feat.write("%f\n" % maxP.xf[i][0])
+            y_feat.write("%f\n" % maxP.xf[i][0])
+            cov.write("%f,%f,%f,%f\n" % maxP.Pf[i][0], maxP.Pf[i][0], maxP.Pf[i][0], maxP.Pf[i][0])
+        x_feat.close()
+        y_feat.close()
+        cov.close()
 
     def __plot_epath(self, xv):
         """
@@ -97,10 +156,17 @@ class ProcessPlotter (object):
             if len(xf):
                 x.append(f[0])
                 y.append(f[1])
-        self.oldFeatures = self.ax1.scatter(x, y, s=1, color='black')
+        self.oldFeatures = self.axtot.scatter(x, y, s=1, color='black')
+
+    def plot_error(self, e):
+        self.olderror.remove()
+        y = []
+        for f in self.error_value:
+            y.append(f)
+        self.olderror = self.axerr.scatter(self.err_vect, y, s=1, color='black')
 
 
-    def __plot_ground_truth(self, time):
+    def __plot_ground_truth(self, time, msg):
         """
         Plots the ground truth up to a certain time instant.
         :param time: current time instant.
@@ -113,19 +179,38 @@ class ProcessPlotter (object):
             self.gty.pop(0)
             self.gttime.pop(0)
             i = i+1
-        self.ax1.scatter(self.xgt, self.ygt, s=1, color='blue')
+        if self.errcount % 50 == 0:
+            self.axtot.scatter(self.xgt, self.ygt, s=1, color='blue')
         if(i): # horrible.
-            self.__plot_error([self.xgt[-1], self.ygt[-1]])
+            self.__plot_error([self.xgt[-1], self.ygt[-1]], msg)
 
 
-    def __plot_error(self, xv_gps):
+    def __plot_error(self, xv_gps, msg):
         xv_hat = np.array(self.epath)[0:2]
         xv_gps = np.array(xv_gps)
 
         d = xv_hat-xv_gps
         e = (d[0]*d[0]+d[1]*d[1])**0.5
-        self.ax2.scatter(self.errcount, e, color = 'blue')
-        self.errcount = self.errcount+1
+
+        self.err_vect.append(self.errcount)
+        self.error_value.append(e)
+        #self.ax2.scatter(self.errcount, e, color = 'blue')
+        if self.errcount % 50 == 0:
+            self.__plot_epath(msg.xv)
+            self.__plot_laser(msg.z, msg.xv)
+            self.plot_error(e)
+            if len(msg.xf):
+                self.__plot_features(msg.xf)
+                self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
+            s = 'output50/map' + str(self.errcount) + '.png'
+            p = 'output50/error' + str(self.errcount) + '.png'
+            self.figtot.savefig(s)
+            self.figerr.savefig(p)
+
+        self.errcount = self.errcount + 1
+        x_map.write("%f\n" %self.xdata[0])
+        y_map.write("%f\n" %self.ydata[0])
+        ferr.write("%f\n" %e)
 
 
     def __plot_laser(self, z, xv):
@@ -133,7 +218,7 @@ class ProcessPlotter (object):
         if self.line_col != None : #remove previous laser lines
             self.line_col.remove()
         lc = mc.LineCollection(lines, colors = np.array(('yellow', 'yellow', 'yellow', 'yellow')), linewidths=2)
-        self.ax1.add_collection(lc)
+        self.axtot.add_collection(lc)
         self.line_col = lc
 
     def make_laser_lines(self, rb, xv):
@@ -201,7 +286,7 @@ class ProcessPlotter (object):
         position = np.squeeze(pos) # TODO: Check why sometimes xv has dimension (2,1) and sometimes (2,)
         position = position.reshape((2, 1))
         p = a + np.matlib.repmat(position, 1, a.shape[1])
-        p1 = self.ax1.scatter(p[0], p[1], s=1, color='green') # TODO: Check if you can provide array vectors instead of integers
+        p1 = self.axtot.scatter(p[0], p[1], s=1, color='green') # TODO: Check if you can provide array vectors instead of integers
         return p1
 
     def TransformToGlobal(self, p, b):
