@@ -11,6 +11,9 @@ from scipy.linalg import schur
 
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
+FEATURES_DISTANCE    = "ObservationDistance.txt"
+FEATURES_ANGLE    = "ObservationAngle.txt"
+
 
 alfa = atan(-22/28)
 c = cos(alfa)
@@ -25,7 +28,7 @@ class ProcessPlotter (object):
         self.xgt = [] #x of ground truth
         self.ygt = [] #y of ground truth
         self.covariances = []
-        self.gttime, self.gtx, self.gty = self.init_ground_truth()
+        self.gttime, self.gtx, self.gty, self.feat_distance_gt, self.feat_angle_gt = self.init_ground_truth()
         self.line_col = None
 
         #Initialize figures
@@ -50,7 +53,12 @@ class ProcessPlotter (object):
             t.append(d[0])
             x.append(d[1]-xoff)
             y.append(d[2]-yoff)
-        return t, x, y
+        feat = np.loadtxt(PATH+FEATURES_DISTANCE,delimiter=',')
+        feat_angle = np.loadtxt(PATH+FEATURES_ANGLE,delimiter=',')
+
+
+        return t, x, y, feat, feat_angle
+
 
     def terminate(self):
         plt.close('all')
