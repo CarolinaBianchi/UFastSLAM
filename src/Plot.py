@@ -42,8 +42,15 @@ class ProcessPlotter (object):
         self.line, = self.ax1.plot([], [], 'r-')
         self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
         self.oldFeatures = self.ax1.scatter([],[])
-
+        self.ax1.set_xlabel('x [m]')
+        self.ax1.set_ylabel('y [m]')
+        self.ax2.set_xlabel('error count')
+        self.ax2.set_ylabel('error [m]')
+        self.ax1.set_title('Result map against GT')
+        self.ax2.set_title('Error')
         plt.ion()
+        mng = plt.get_current_fig_manager()
+        mng.window.state('zoomed')  # works fine on Windows!
         plt.show()
 
 
@@ -124,8 +131,8 @@ class ProcessPlotter (object):
 
         d = xv_hat-xv_gps
         e = (d[0]*d[0]+d[1]*d[1])**0.5
-        self.ax2.scatter(self.errcount, e, color = 'blue')
-        if self.errcount % 100 == 0:
+        self.ax2.scatter(self.errcount, e, color = 'blue', s = 1)
+        if self.errcount % 40 == 0:
             self.__plot_epath(msg.xv)
             self.__plot_laser(msg.z, msg.xv)
             if len(msg.xf):

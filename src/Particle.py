@@ -280,6 +280,7 @@ class Particle:
             n_hati[1] = pi_to_pi(n_hati[1]) # now use pi_to_pi for angle with respect car of possible landmark
             n_hat[2 * i: 2 * i + 2,:] = n_hati
 
+        # KALMAN PART
         # Augmented noise matrix
         R_aug = zeros((dimf * lenidf, dimf * lenidf))
         for i in range(lenidf):
