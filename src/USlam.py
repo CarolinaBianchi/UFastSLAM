@@ -12,6 +12,7 @@ import time
 import numpy as np
 from numpy import zeros, eye, size, linalg
 
+np.random.seed(1)
 
 def init_particles(npart):
     w = 1 / npart
@@ -89,21 +90,19 @@ def stratified_resample(w):  # TODO: Check w is normalized
 
 def stratified_random(N):
     k = 1 / N
-    #di = np.arange(k / 2, 1 - k / 2, k)  # deterministic intervals
-    di = np.arange(k / 2, 1, k)
+    di = np.arange(k / 2, 1, k) # deterministic intervals
     s = di + np.random.rand(N) * k - k / 2  # dither within interval
     return s
 
 
 epath = []
 def main():
-
+    start_time = time.time()
     # Initialization
     ctrl = ControlPublisher()
     sensor = Sensor()
     particles = init_particles(C.NPARTICLES)
-    plot_pipe, plotter_pipe = mp.Pipe()
-    plotter = ProcessPlotter()
+    plotter = ProcessPlotter() # Initialize the class where all the plots will occur
 
     for i, t in enumerate(C.T):
         ctrlData = ctrl.read(t)
@@ -118,7 +117,7 @@ def main():
             if size(z):
                 # Data associations
                 for particle in particles:
-                    particle.data_associateNN(z)
+                    particle.data_associateNN(z, plotter)
 
                 # Known map features
                 for particle in particles:
@@ -137,10 +136,8 @@ def main():
                     if particle.zn.size:
                         particle.augment_map()
 
-    #plot_pipe.send(True) # some message so the process knows is the end and send the figure
+    print("--- %s seconds ---" % (time.time() - start_time))
 
-    #figure = plot_pipe.recv()
-    #figure.savefig('results/uslam_map_victoria.png')
     plotter.terminate()
 
 def get_message(particles, z, t):

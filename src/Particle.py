@@ -13,6 +13,7 @@ from math import sin, cos, nan
 from Utils import pi_to_pi
 
 EPS = C.EPS
+np.random.seed(1)
 
 class Particle:
     #Static constant attributes
@@ -119,7 +120,7 @@ class Particle:
         self.Pv = Pv_p
         self.Kaiy = Kaiy
 
-    def data_associateNN(self, z):
+    def data_associateNN(self, z, plotter):
         """
         Implements a simple gated nearest-neighbour data-association.
         Modifies the particle's zf, idf and zn.
@@ -131,8 +132,6 @@ class Particle:
         zf, zn, idf = [],[],[]
         Nf = size(self.xf, 1) # number of known features
         xv = self.xv
-        zp = zeros((2, 1))
-
         for meas in z:
 
             jbest = -1
@@ -165,7 +164,6 @@ class Particle:
             elif outer > G_AUG : # if no features saved yet it will get inside here
                 zn.append([meas.distance, meas.angle])
 
-
         self.zf, self.idf, self.zn = np.array(zf), np.array(idf), np.array(zn).T
 
     def __compute_association_nis(self, z, R, idf):
@@ -193,12 +191,9 @@ class Particle:
         d = sqrt(d2)
         zp = np.array([d,pi_to_pi(atan2(dy, dx)-xv[2])]) # predicted measure from car frame to the feature
 
-        #Hv = np.array(  [[-dx/d, -dy/d, 0],                # Jacobian wrt vehicle states
-        #                [dy/d2, -dx/d2, -1]])
         Hf = np.array([[dx/d, dy/d],                       # Jacobian wrt feature states
                         [-dy/d2, dx/d2]])
         Sf = np.dot(np.dot(np.squeeze(Hf), Pf), np.transpose(np.squeeze(Hf))) + R
-        #Sv = np.dot(np.dot(Hv, self.Pv), np.transpose(Hv))+ R
         return (zp, Sf)
 
     def sample_proposaluf(self):
@@ -341,10 +336,6 @@ class Particle:
         dimf = self.zf.shape[1] # feature state dimension
         xf = self.xf[:, self.idf]
         Pf = self.Pf[:,:, self.idf]
-        # HARDCODED VALUES JUST FOR TESTING
-        #self.xv[0] = 0.169956293382486
-        #self.xv[1] = 5.540053567362944e-04
-        #self.xv[2] = 1.443584553182200e-04
         for i in range(len(self.idf)):
             # augmented feature state
             xf_aug = np.append(xf[:,i].reshape((2,1)), zeros((2, 1)), axis=0)  # to add control input and observation that agree with known features
