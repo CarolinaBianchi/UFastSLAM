@@ -1,12 +1,10 @@
 """
 A particle.
 """
-from math import tan,cos,sin,sqrt,atan2,pi,exp
+from math import tan, sqrt,atan2,pi,exp
 import numpy as np
 import numpy.matlib
 from numpy import zeros, eye, size, linalg
-from Sensor import ListSensorMeasurements, SensorMeasurement
-from Control import Control
 import Constants as C
 import copy
 from math import sin, cos, nan
@@ -213,7 +211,6 @@ class Particle:
         lenidf = np.size(self.idf)                          # number of currently observed features
         dimv = self.xv.shape[0]                             # vehicle state dimension
         dimf = self.zf.shape[1]                             # feature state dimension
-        # TODO: Why self.zf provides info in row format and not in columns?
         n_hat = zeros((dimf * lenidf, 1))                   # predictive observation
         z = zeros((dimf * lenidf, 1))                       # sensory observation
         N = zeros((dimf * lenidf, 2 * self.n_aug + 1))      # stack of innovation covariance for vehicle uncertainty
@@ -225,8 +222,6 @@ class Particle:
             j = self.idf[i]                                 # index of this observed feature
             xfi[:,0] = self.xf[:,j]                         # get j-th feature mean
             Pfi = self.Pf[:,:,j]                            # get j-th feature cov.
-
-            # TODO: Check why zf had dimension num_obs x 2 instead of 2 x num_obs
             z[2 * i : 2 * i + 2, 0] = self.zf[i,:]          # stack of sensory observations
 
             # state augmentation
@@ -265,7 +260,7 @@ class Particle:
                             bearing = bearing - 2 * pi
                             bs[k] = np.sign(bearing)
 
-                # distance + angle ; bearing ** do not use pi_to_pi here **
+                # distance + angle ; bearing
                 Ni[:,k] = np.append(np.array([r]),np.array([bearing - Ksi[dimv-1, k]]),axis = 0)
 
                 # (EQ 9) - Weighted mean for each sigma point
@@ -314,8 +309,8 @@ class Particle:
 
 
         # Update weights (parallel process): ERB for SLAM problem
-        Lt = S                                             # faster...
-        #Lt = (Sigma.T.dot(linalg.inv(Pv))).dot(Sigma) + S   # square matrix of 'dimf*lenidf'
+        #Lt = S                                             # faster...
+        Lt = (Sigma.T.dot(linalg.inv(Pv))).dot(Sigma) + S   # square matrix of 'dimf*lenidf'
         den = sqrt(2 * pi * linalg.det(Lt))
         num = exp(-0.5 * linalg.multi_dot([np.transpose(v), linalg.inv(Lt), v]))
         w = num / den
@@ -341,10 +336,7 @@ class Particle:
         dimf = self.zf.shape[1] # feature state dimension
         xf = self.xf[:, self.idf]
         Pf = self.Pf[:,:, self.idf]
-        # HARDCODED VALUES JUST FOR TESTING
-        #self.xv[0] = 0.169956293382486
-        #self.xv[1] = 5.540053567362944e-04
-        #self.xv[2] = 1.443584553182200e-04
+
         for i in range(len(self.idf)):
             # augmented feature state
             xf_aug = np.append(xf[:,i].reshape((2,1)), zeros((2, 1)), axis=0)  # to add control input and observation that agree with known features
@@ -398,7 +390,10 @@ class Particle:
 
 
     def augment_map(self):
-        #if len(self.zn) != 0: # new features seen that are not still saved
+        """
+        Add new features to the current map.
+        :return:
+        """
         if len(self.zf) == 0: # Sample from proposal distribution, if we have not already done so above. Gets inside
             # if already features saved
             self.xv = np.random.multivariate_normal(np.squeeze(self.xv), self.Pv)

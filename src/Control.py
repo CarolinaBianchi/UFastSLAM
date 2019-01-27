@@ -24,7 +24,6 @@ class ControlPublisher:
         """
         Populates self.odometry, array of Odometry objects
         """
-        ctrls={}
         fspeed = open ( PATH + SPEED, 'r')
         fsteer = open ( PATH + STEERING, 'r')
         ftime  = open ( PATH + TIME, 'r')

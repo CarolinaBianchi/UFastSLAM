@@ -1,5 +1,5 @@
 """
-A vehicle. Modeled by ? (CHECK meaning).
+A vehicle. Modeled by ACFR - The Univeristy of Sidney.
 All measures are assumed to be in meters.
 """
 class Vehicle:

@@ -1,6 +1,5 @@
-import numpy as np
 """
-Message exchanged between the main process and the plotter process.
+Message exchanged between the main process and the plotter.
 """
 class Message():
     def __init__(self, xv, Pv, xf, Pf, z,  time):

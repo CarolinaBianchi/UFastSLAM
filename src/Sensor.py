@@ -2,7 +2,7 @@
 Class representing the distance sensor.
 The main method exposed is the "read" method.
 Each time this method is called, the sensor returns the set of read values at
-the current time instantself.
+the current time instant.
 """
 
 PATH        = "../victoria_park/"
@@ -54,12 +54,6 @@ class Sensor:
         global N_MEASUREMENTS, N_SAMPLING
         N_MEASUREMENTS = len(measurements)
         N_SAMPLING = len(t)
-        #for distances,angles, time  in zip(d, a,t):
-        #    measurement_dt = []
-        #    for dist, ang in zip(distances, angles):
-        #        measurement_dt.append(SensorMeasurement(dist, ang))
-        #    measurements.append(ListSensorMeasurements(t, measurement_dt))
-
 
         return measurements
 
@@ -81,11 +75,6 @@ class Sensor:
 
                 if(next.time >= t1 and next.time<t2):
                     l.append(self.measurements.pop(0))
-                    # TODO: As always appends 18 measurements per timestep even though some of the have distance 0 and angle < 10^6
-                    #for i in range(len(next.list)):
-                    #    if next.list[i].distance!=0:
-                    #        l.append(next.list[i])
-                    #self.measurements.pop(0)
                 else:
                     break
         except: # no more measurements
@@ -93,4 +82,3 @@ class Sensor:
         return l
 
 s = Sensor()
-#print(s.read(24300, 28440))

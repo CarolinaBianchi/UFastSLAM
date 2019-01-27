@@ -4,6 +4,7 @@ from Sensor import N_MEASUREMENTS, N_SAMPLING
 from Vehicle import Vehicle
 from numpy import finfo, pi
 
+
 EPS = finfo(float).eps # Machine epsilon
 PI = pi
 

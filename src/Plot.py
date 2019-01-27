@@ -1,31 +1,27 @@
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
-import Constants as C
 import numpy as np
 from numpy import linalg
-import Message
 from math import sin, cos, atan, pi
 from matplotlib import collections  as mc
 from scipy.linalg import schur
 
 PATH        = "../victoria_park/"
 GPS         = "mygps.txt"
+IMGPATH     = "output_img/"
+OUTPATH     = "output/"
 
-
-#alfa = atan(-19/28)
+#Rotational data for GPS
 alfa = atan(-0.71)
 c = cos(alfa)
 s = sin(alfa)
-ferr = open('output/error.txt', "w+")
-x_map = open('output/x_data.txt', "w+")
-y_map = open('output/y_data.txt', "w+")
-x_feat = open('output/x_feat.txt', "w+")
-y_feat = open('output/y_feat.txt', "w+")
-cov = open('output/cov.txt', "w+")
-#cov01 = open('output/cov01.txt', "w+")
-#cov10 = open('output/cov10.txt', "w+")
-#cov11 = open('output/cov11.txt', "w+")
+ferr = open(OUTPATH+'error.txt', "w+")
+x_map = open(OUTPATH+'x_data.txt', "w+")
+y_map = open(OUTPATH+'y_data.txt', "w+")
+x_feat = open(OUTPATH+'x_feat.txt', "w+")
+y_feat = open(OUTPATH+'y_feat.txt', "w+")
+cov = open(OUTPATH+'cov.txt', "w+")
 
 class ProcessPlotter (object):
     def __init__(self):
@@ -44,52 +40,51 @@ class ProcessPlotter (object):
         self.gttime, self.gtx, self.gty = self.init_ground_truth()
         self.line_col = None
 
-        #Initialize figures
-        """
-        self.fig, ((self.ax1, self.ax2)) = plt.subplots(1, 2)
-        self.fig.tight_layout()  # Or equivalently,  "plt.tight_layout()"
-        self.ax1.set_xlim(-150, 250)
-        self.ax1.set_ylim(-150, 250)
-        self.ax2.set_ylim(0,30)
-        self.ax1.set_xlabel('x [m]')
-        self.ax1.set_ylabel('y [m]')
-        self.ax2.set_xlabel('number steps')
-        self.ax2.set_ylabel('error [m]')
-        self.ax1.set_title('Result map against GT')
-        self.ax2.set_title('Error')
-        self.ax1.set_aspect('equal')
-        """
+        # Create output directories
+        import os
+        if not os.path.exists(OUTPATH):
+            os.makedirs(OUTPATH)
+        if not os.path.exists(IMGPATH):
+            os.makedirs(IMGPATH)
 
-        self.figtot, self.axtot = plt.subplots()
-        self.axtot.set_xlim(-150, 250)
-        self.axtot.set_ylim(-150, 250)
-        self.axtot.set_xlabel('x [m]')
-        self.axtot.set_ylabel('y [m]')
-        self.axtot.set_title('Result map against GT')
+    def settings(self, do_plot, frequency, save):
+        """Enables plotting and its frequency and saving images to output folder."""
+        self.doplot = do_plot
+        self.frequency = frequency
+        self.save = save
+        if(do_plot):
 
-        self.figerr, self.axerr = plt.subplots()
-        self.axerr.set_ylim(0, 17)
-        self.axerr.set_xlabel('number steps')
-        self.axerr.set_xlabel('number steps')
-        self.axerr.set_ylabel('error [m]')
-        self.axerr.set_title('Error')
+            self.figtot, self.axtot = plt.subplots()
+            self.axtot.set_xlim(-150, 250)
+            self.axtot.set_ylim(-150, 250)
+            self.axtot.set_aspect('equal')
+            self.axtot.set_xlabel('x [m]')
+            self.axtot.set_ylabel('y [m]')
+            self.axtot.set_title('Result map against GT')
 
+            self.figerr, self.axerr = plt.subplots()
+            self.axerr.set_ylim(0, 17)
+            self.axerr.set_xlabel('number steps')
+            self.axerr.set_xlabel('number steps')
+            self.axerr.set_ylabel('error [m]')
+            self.axerr.set_title('Error')
 
-        #self.line, = self.ax1.plot([], [], 'r-')
-        self.line, = self.axtot.plot([], [], 'r-')
+            self.line, = self.axtot.plot([], [], 'r-')
 
-        # self.gt, = self.ax1.plot(self.xgt, self.ygt, 'g-')
-        self.gt, = self.axtot.plot(self.xgt, self.ygt, 'g-')
-        self.oldFeatures = self.axtot.scatter([],[])
-        self.olderror = self.axerr.scatter([],[])
+            self.gt, = self.axtot.plot(self.xgt, self.ygt, 'g-')
+            self.oldFeatures = self.axtot.scatter([], [])
+            self.olderror = self.axerr.scatter([], [])
 
-        plt.ion()
-        mng = plt.get_current_fig_manager()
-        mng.window.state('zoomed')
-        plt.show()
-
+            plt.ion()
+            #mng = plt.get_current_fig_manager()
+            #mng.window.state('zoomed')
+            plt.show()
 
     def init_ground_truth(self):
+        """
+        Processes the GPS data and rotates it in order to match the control data rotation.
+        :return:
+        """
         f = open(PATH+GPS)
         data = [[float(num) for num in line.split(',') if len(num) > 0] for line in f]
         f.close()
@@ -102,23 +97,58 @@ class ProcessPlotter (object):
         return t, x, y
 
     def terminate(self):
+        """
+        Closes all, saves last figure.
+        """
         ferr.close()
         x_map.close()
         y_map.close()
 
-        self.figtot.savefig('output50/uslam_map_victoria.png')
+        self.figtot.savefig(IMGPATH+'/uslam_map_victoria.png')
         plt.close('all')
 
     def update(self, msg):
+        """
+        Updates the plot
+        :param msg: message containing the new information produced in this step.
+        :return:
+        """
         self.epath = msg.xv
         self.xdata.append(self.epath[0])
         self.ydata.append(self.epath[1])
         self.theta.append(self.epath[2])
         self.__plot_ground_truth(msg.time, msg)
-        plt.draw()
-        plt.pause(1e-15)
+        if(self.doplot):
+            plt.draw()
+            plt.pause(1e-15)
+
+    def __plot_ground_truth(self, time, msg):
+        """
+        Plots the ground truth up to a certain time instant.
+        :param time: current time instant.
+        """
+        i = 0
+        while(self.gttime[0]<time):
+            self.xgt.append(self.gtx[0]*c-self.gty[0]*s)
+            self.ygt.append(self.gtx[0]*s+self.gty[0]*c)
+            self.gtx.pop(0)
+            self.gty.pop(0)
+            self.gttime.pop(0)
+            i = i+1
+
+        if(self.doplot):
+            if self.errcount % self.frequency == 0:
+                self.axtot.scatter(self.xgt, self.ygt, s=1, color='blue')
+
+            if(i): # If we got a new ground truth info.
+                self.__plot_error([self.xgt[-1], self.ygt[-1]], msg)
 
     def save_feat(self, particles):
+        """
+        Saves estimated feature position to a file.
+        :param particles:
+        :return:
+        """
         ws = [particle.w for particle in particles]
         maxInd = ws.index(max(ws))
         maxP = particles[maxInd]
@@ -142,7 +172,6 @@ class ProcessPlotter (object):
         self.theta.append(self.epath[2])
         self.line.set_xdata(self.xdata)
         self.line.set_ydata(self.ydata)
-        #plt.pause(1e-15)
 
     def __plot_features(self, xf):
         """
@@ -159,30 +188,12 @@ class ProcessPlotter (object):
         self.oldFeatures = self.axtot.scatter(x, y, s=1, color='black')
 
     def plot_error(self, e):
+        """Plots the error in estimation."""
         self.olderror.remove()
         y = []
         for f in self.error_value:
             y.append(f)
         self.olderror = self.axerr.scatter(self.err_vect, y, s=1, color='black')
-
-
-    def __plot_ground_truth(self, time, msg):
-        """
-        Plots the ground truth up to a certain time instant.
-        :param time: current time instant.
-        """
-        i = 0
-        while(self.gttime[0]<time):
-            self.xgt.append(self.gtx[0]*c-self.gty[0]*s)
-            self.ygt.append(self.gtx[0]*s+self.gty[0]*c)
-            self.gtx.pop(0)
-            self.gty.pop(0)
-            self.gttime.pop(0)
-            i = i+1
-        if self.errcount % 50 == 0:
-            self.axtot.scatter(self.xgt, self.ygt, s=1, color='blue')
-        if(i): # horrible.
-            self.__plot_error([self.xgt[-1], self.ygt[-1]], msg)
 
 
     def __plot_error(self, xv_gps, msg):
@@ -194,18 +205,19 @@ class ProcessPlotter (object):
 
         self.err_vect.append(self.errcount)
         self.error_value.append(e)
-        #self.ax2.scatter(self.errcount, e, color = 'blue')
-        if self.errcount % 50 == 0:
+
+        if self.errcount % self.frequency == 0 and self.doplot:
             self.__plot_epath(msg.xv)
             self.__plot_laser(msg.z, msg.xv)
             self.plot_error(e)
             if len(msg.xf):
                 self.__plot_features(msg.xf)
                 self.__plot_covariance_ellipse(msg.xv, msg.Pv, msg.xf, msg.Pf)
-            s = 'output50/map' + str(self.errcount) + '.png'
-            p = 'output50/error' + str(self.errcount) + '.png'
-            self.figtot.savefig(s)
-            self.figerr.savefig(p)
+            if(self.save):
+                s = IMGPATH+'map' + str(self.errcount) + '.png'
+                p = IMGPATH+'error' + str(self.errcount) + '.png'
+                self.figtot.savefig(s)
+                self.figerr.savefig(p)
 
         self.errcount = self.errcount + 1
         x_map.write("%f\n" %self.xdata[0])
@@ -214,6 +226,11 @@ class ProcessPlotter (object):
 
 
     def __plot_laser(self, z, xv):
+        """
+        Plots laser lines.
+        :param z: observed features
+        :param xv: vehicle pose.
+        """
         lines = self.make_laser_lines(z, xv)
         if self.line_col != None : #remove previous laser lines
             self.line_col.remove()
@@ -244,11 +261,9 @@ class ProcessPlotter (object):
             # lnes = np.append([lnes_x, lnes_y, lnes_angle], axis = 0)
         lnes_end_pos = self.TransformToGlobal([np.multiply(lnes_distance[0], np.cos(lnes_angle[0])),
                                           np.multiply(lnes_distance[0], np.sin(lnes_angle[0]))], xv)
-        # p = line_plot_conversion([lnes_x, lnes_y, lnes_end_pos])
         data = []
         for i in range(len(rb)):
             data.append([(lnes_x[0][i], lnes_y[0][i]), (lnes_end_pos[0][i], lnes_end_pos[1][i])])
-            # data.append((lnes_end_pos[0][i], lnes_end_pos[1][i]))
         return data
 
     def __plot_covariance_ellipse(self, xv, Pv, xf, Pf):
@@ -283,10 +298,10 @@ class ProcessPlotter (object):
         R[0, 1] = T[0, 1] / (R[0, 0] + R[1, 1])
         r = linalg.multi_dot([Q, R, Q.T])
         a = np.dot(r, circ)
-        position = np.squeeze(pos) # TODO: Check why sometimes xv has dimension (2,1) and sometimes (2,)
+        position = np.squeeze(pos)
         position = position.reshape((2, 1))
         p = a + np.matlib.repmat(position, 1, a.shape[1])
-        p1 = self.axtot.scatter(p[0], p[1], s=1, color='green') # TODO: Check if you can provide array vectors instead of integers
+        p1 = self.axtot.scatter(p[0], p[1], s=1, color='green')
         return p1
 
     def TransformToGlobal(self, p, b):
@@ -302,8 +317,3 @@ class ProcessPlotter (object):
         p[1] = p[1] + b[1]
 
         return p
-
-
-
-
-
