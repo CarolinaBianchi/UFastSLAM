@@ -152,7 +152,7 @@ In the following figures (Figure 17, Figure 18, Figure 19) we can observe the re
   <tbody>
   <tr>
     <td width="33%"><img src="media/CarolinaBianchi_report-025.png"></td>
-    <td width="33%"><img src="media/CarolinaBianchi_report-026.png"></td>
+    <td width="33%"><img src="media/CarolinaBianchi_report-026.jpg"></td>
     <td width="33%"><img src="media/CarolinaBianchi_report-027.png"></td>
   </tr>
     <tr>
@@ -213,12 +213,17 @@ We observed a certain variance in the results from running the algorithm with 5 
   </tbody>
 </table>
 
-## References
+## Possible improvements
+<ul>
+  <li>Save the features in a tree-structure, to make the computational time lower.</li>
+  <li>Integrate the program with some other module to allow multithreading, since it exposes a lot of parallel computation (the whole computation done for each particle is indipendent one of the other).</li>
+</ul>
 
+## References
   <a id="bib1">[1]<b> C. Kim, R. Sakthivel and W. K. Chung. </b> Unscented FastSLAM: A Robust and Efficient Solution to the
-    SLAM Problem. <i>IEEE Transactions on Robotics.</i> 2008, Vol. 24, 4, pp. 808-820.
-  <a id="bib2">[2]<b>Sydney, ACFR - The University of.</b> <i> Victoria Park dataset.</i>
-  <a id="bib3">[3]<b>Sebastian Thrun, Wolfram Burgard and Dieter Fox. </b> EKF SLAM with Unknown Correspondences. <i>Probabilistic Robotics. </i> 10.3, p. 323.
+    SLAM Problem. <i>IEEE Transactions on Robotics.</i> 2008, Vol. 24, 4, pp. 808-820.<br>
+  <a id="bib2">[2]<b>Sydney, ACFR - The University of.</b> <i> Victoria Park dataset.</i><br>
+  <a id="bib3">[3]<b>Sebastian Thrun, Wolfram Burgard and Dieter Fox. </b> EKF SLAM with Unknown Correspondences. <i>Probabilistic Robotics. </i> 10.3, p. 323.<br>
  
 
 ## Acknowledgments
