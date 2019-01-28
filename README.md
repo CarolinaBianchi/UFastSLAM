@@ -205,7 +205,7 @@ We observed a certain variance in the results from running the algorithm with 5 
 <table>
 <tbody>
   <tr>
-    <td><img src = "media/CarolinaBianchi_report-024.png"></td>
+    <td><img src = "media/CarolinaBianchi_report-029.png"></td>
   </tr>
   <tr>
     <td>Figure 20 - Another run using 5 particles.</td>
